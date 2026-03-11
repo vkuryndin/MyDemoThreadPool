@@ -11,6 +11,8 @@ import org.example.threadpool.worker.WorkerController;
 
 import org.example.threadpool.metrics.PoolMetricsSnapshot;
 
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -117,6 +119,16 @@ public class CustomThreadPool implements CustomExecutor, WorkerController {
      * Peak total number of pending tasks in all worker queues.
      */
     private final AtomicLong peakPendingTaskCount = new AtomicLong(0);
+
+    /**
+     * Workers that have already received permission to stop because of idle timeout,
+     * but have not fully terminated yet.
+     *
+     * This reservation prevents multiple workers from stopping simultaneously
+     * and shrinking the pool below corePoolSize.
+     */
+    private final Set<Worker> workersStoppingOnIdle = new HashSet<>();
+
 
     /**
      * Internal wrapper around a task that increments the completed counter
@@ -466,15 +478,30 @@ public class CustomThreadPool implements CustomExecutor, WorkerController {
     }
 
     /**
-     * Allows a worker to stop after idle timeout only if the pool currently
-     * has more workers than corePoolSize.
+     * Allows a worker to stop after idle timeout only if the effective worker count
+     * is still greater than corePoolSize.
+     *
+     * Effective worker count means:
+     * current workers minus workers that have already reserved idle termination.
+     *
+     * This prevents two or more workers from stopping at the same time
+     * and shrinking the pool below corePoolSize.
      *
      * @param worker the worker that asks for permission to stop
      * @return true if this worker may stop
      */
     @Override
     public boolean shouldWorkerStopOnIdle(Worker worker) {
-        return getWorkerCount() > config.getCorePoolSize();
+        synchronized (stateLock) {
+            int effectiveWorkerCount = workers.size() - workersStoppingOnIdle.size();
+
+            if (effectiveWorkerCount > config.getCorePoolSize()) {
+                workersStoppingOnIdle.add(worker);
+                return true;
+            }
+
+            return false;
+        }
     }
 
     /**
@@ -485,6 +512,7 @@ public class CustomThreadPool implements CustomExecutor, WorkerController {
     @Override
     public void onWorkerTerminated(Worker worker) {
         synchronized (stateLock) {
+            workersStoppingOnIdle.remove(worker);
             workers.remove(worker);
             workerThreads.remove(worker);
         }
