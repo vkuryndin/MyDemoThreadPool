@@ -134,6 +134,55 @@ If no task arrives within the timeout period, the worker may terminate, but only
 
 This allows the pool to grow under load and shrink back when the extra workers are no longer needed.
 
+### Code structure
+    src
+    ├── main
+    │   └── java
+    │      └── org
+    │         └── example
+    │            ├── threadpool
+    │            │   ├── api
+    │            │   │   └── CustomExecutor.java
+    │            │   ├── balancer
+    │            │   │   ├── RoundRobinBalancer.java
+    │            │   │   └── TaskBalancer.java
+    │            │   ├── config
+    │            │   │   └── PoolConfig.java
+    │            │   ├── core
+    │            │   │   └── CustomThreadPool.java
+    │            │   ├── demo
+    │            │   │   ├── DemoCallableTask.java
+    │            │   │   ├── DemoTask.java
+    │            │   │   └── Main.java
+    │            │   ├── factory
+    │            │   │   └── CustomThreadFactory.java
+    │            │   ├── metrics
+    │            │   │   └── PoolMetricsSnapshot.java
+    │            │   ├── queue
+    │            │   ├── rejection
+    │            │   │   └── RejectionPolicy.java
+    │            │   └── worker
+    │            │       └── WorkerController.java
+    │            └── Main.java
+    └── test
+        └── java
+           └── org
+              └── example
+                 └── threadpool
+                    ├── balancer
+                    │   └── RoundRobinBalancerTest.java
+                    ├── config
+                    │   └── PoolConfigTest.java
+                    ├── core
+                    │   ├── CustomThreadPoolExecuteTest.java
+                    │   ├── CustomThreadPoolShutdownTest.java
+                    │   └── CustomThreadPoolSubmitTest.java
+                    │   └── CustomThreadPoolGracefulShutdownTest.java
+                    ├── factory
+                    │   └── CustomThreadFactoryTest.java
+                    └── rejection
+                        └── RejectPolicyTest.java
+
 ## Main Components
 
 ### `CustomExecutor`
