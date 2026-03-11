@@ -656,6 +656,27 @@ The logs help observe:
 
 This makes the project easier to debug, explain, and demonstrate.
 
+### Metrics summary output
+
+In addition to event-based logs, the demo program prints a metrics summary after each scenario.
+
+This summary includes:
+
+- submitted tasks
+- accepted tasks
+- rejected tasks
+- completed tasks
+- current worker count
+- peak worker count
+- current and peak pending tasks
+- scenario duration
+- accepted throughput
+- completed throughput
+- rejection rate
+
+This makes the demo not only illustrative, but also measurable.
+
+
 ## Demo Scenarios
 
 The project includes a demonstration class `Main` that shows the behavior of the custom thread pool in several scenarios.
@@ -668,11 +689,25 @@ This scenario demonstrates:
 - pool growth up to `maxPoolSize`
 - rejection of tasks when overload happens
 - graceful shutdown
+- metrics collection for accepted, rejected, and completed tasks
 
 Several long-running `DemoTask` instances are submitted quickly.
 Because tasks take time to finish, worker queues become full, additional workers may be created, and eventually some tasks may be rejected.
 
 After that, `shutdown()` is called so that the pool can stop accepting new tasks while still finishing already accepted work.
+
+Typical metrics to observe in this scenario:
+
+- `submittedTaskCount`
+- `acceptedTaskCount`
+- `rejectedTaskCount`
+- `completedTaskCount`
+- `peakWorkerCount`
+- `peakPendingTaskCount`
+- accepted throughput
+- rejection rate
+
+This scenario is the most useful for observing overload behavior.
 
 ### Demo 2: `submit()` + `Future`
 
@@ -682,11 +717,21 @@ This scenario demonstrates:
 - wrapping into `FutureTask`
 - receiving results through `Future`
 - blocking behavior of `Future.get()`
+- metrics collection for accepted and completed tasks
 
 Several `DemoCallableTask` objects are submitted to the pool.
 Each task simulates work and then returns a readable result string.
 
-The demo then reads those results using future.get().
+The demo then reads those results using 'future.get()'.
+
+Typical metrics to observe in this scenario:
+
+- accepted tasks
+- completed tasks
+- worker utilization
+- completed throughput
+
+This scenario is useful for confirming that the pool correctly supports tasks with results.
 
 ### Demo 3: `shutdownNow()`
 
@@ -696,6 +741,7 @@ This scenario demonstrates:
 - clearing of pending tasks from worker queues
 - interruption of worker threads
 - interruption-aware task behavior
+- difference between accepted and completed tasks
 
 Several long-running tasks are submitted.
 After a short delay, `shutdownNow()` is called.
@@ -708,14 +754,63 @@ At that point:
 The waiting tasks are cleared, and worker threads are interrupted.
 If the running tasks react to interruption correctly, they stop early and print interruption logs.
 
+Typical metrics to observe in this scenario:
+
+- accepted tasks
+- completed tasks
+- cleared pending tasks
+- rejection rate
+- final worker count after shutdown
+
+A particularly important observation here is that `acceptedTaskCount` may be greater than `completedTaskCount`, because some accepted tasks may still be removed from queues during `shutdownNow()` before they start executing.
 
 ## Performance Notes
 
 This project was implemented primarily as an educational custom thread pool, not as a production-ready high-performance replacement for `ThreadPoolExecutor`.
 
-Because of that, performance analysis in this report is mostly **qualitative**, based on the design of the implementation and expected runtime behavior.
+At the same time, the current version already includes **built-in runtime metrics**, which makes it possible to observe real pool behavior during demo execution instead of relying only on theoretical assumptions.
 
-A full performance study could be added later with dedicated benchmarks.
+### Collected runtime metrics
+
+The pool collects the following internal metrics:
+
+- `submittedTaskCount` — total number of tasks submitted to the pool
+- `acceptedTaskCount` — total number of tasks accepted by worker queues
+- `rejectedTaskCount` — total number of tasks rejected by the pool
+- `completedTaskCount` — total number of tasks whose execution finished
+- `currentWorkerCount` — current number of workers in the pool
+- `busyWorkerCount` — number of workers currently executing tasks
+- `idleWorkerCount` — number of currently idle workers
+- `peakWorkerCount` — maximum number of workers observed during pool lifetime
+- `currentPendingTaskCount` — total number of tasks currently waiting in worker queues
+- `peakPendingTaskCount` — maximum queue pressure observed during pool lifetime
+
+At the demo level, the application also measures:
+
+- total scenario duration
+- accepted throughput (`acceptedTaskCount / duration`)
+- completed throughput (`completedTaskCount / duration`)
+- rejection rate (`rejectedTaskCount / submittedTaskCount`)
+
+### Why these metrics are useful
+
+These metrics help evaluate several important aspects of pool behavior:
+
+- how aggressively the pool scales up
+- how often overload happens
+- how many tasks are actually completed
+- how much queue pressure builds up
+- how shutdown mode affects accepted and completed work
+- how configuration changes influence throughput and rejection
+
+### Interpreting the metrics
+
+Some metrics should be interpreted carefully:
+
+- `submittedTaskCount` includes both accepted and rejected tasks
+- `acceptedTaskCount` includes tasks that were successfully placed into queues
+- `completedTaskCount` includes only tasks that actually finished execution
+- during `shutdownNow()`, it is normal for `acceptedTaskCount` to be greater than `completedTaskCount`, because some accepted tasks may still be removed from queues before execution starts
 
 ### Factors that influence performance in this implementation
 
@@ -788,19 +883,7 @@ If it is too low, sudden spikes may experience additional latency.
 If the timeout is too short, the pool may shrink too aggressively and recreate workers often.  
 If it is too long, unnecessary workers may remain alive longer than needed.
 
----
-
-### Practical observations
-
-For the current design, the most balanced configuration is usually one where:
-
-- `corePoolSize` covers normal load
-- `maxPoolSize` allows moderate burst handling
-- `queueSize` is large enough to absorb short spikes but not so large that tasks wait too long
-- `minSpareThreads` is small but non-zero
-- `keepAliveTime` is long enough to avoid frequent worker creation and destruction
-
-### Suggested mini-study
+### Example of mini-study approach
 
 A simple mini-study for this project can compare several configurations such as:
 
@@ -834,9 +917,35 @@ Expected result:
 - higher memory and thread management overhead
 - potentially more waiting inside queues
 
-For an educational report, it is acceptable to describe these expected trade-offs even if full benchmarking is not performed.
+### Suggested way to report measured results
 
----
+After running the demo scenarios, the collected metrics can be summarized in the report, for example:
+
+- number of submitted, accepted, rejected, and completed tasks
+- peak worker count reached under load
+- peak pending task count observed in queues
+- accepted throughput and completed throughput
+- rejection rate for overload scenarios
+- difference between graceful shutdown and immediate shutdown behavior
+
+This makes the performance section more evidence-based and better connected to the actual implementation.
+
+### Example measured results
+
+| Scenario | Submitted | Accepted | Rejected | Completed | Current Workers | Peak Workers | Peak Pending | Duration (s) | Accepted Throughput (tasks/s) | Completed Throughput (tasks/s) | Rejection Rate |
+|----------|-----------|----------|----------|-----------|-----------------|--------------|--------------|--------------|-------------------------------|--------------------------------|----------------|
+| Demo 1: execute() + overload + shutdown() | 12 | 12 | 0 | 12 | 0 | 4 | 8 | 17.017 | 0.705 | 0.705 | 0.00% |
+| Demo 2: submit() + Future | 3 | 3 | 0 | 3 | 2 | 2 | 1 | 6.013 | 0.499 | 0.499 | 0.00% |
+| Demo 3: shutdownNow() | 8 | 8 | 0 | 3 | 0 | 3 | 6 | 7.024 | 1.139 | 0.427 | 0.00% |
+
+
+### Observations from measured results
+
+- Demo 1 shows that the pool scaled up to 4 workers and completed all 12 accepted tasks during graceful shutdown.
+- Demo 2 confirms correct support for `Callable` tasks and `Future` results, with all submitted tasks completed successfully.
+- Demo 3 clearly demonstrates the effect of `shutdownNow()`: all 8 tasks were accepted, but only 3 tasks were completed because 5 pending tasks were cleared from queues during immediate shutdown.
+- The highest accepted throughput was observed in Demo 3, but completed throughput was much lower because immediate shutdown interrupted execution before all accepted tasks could finish.
+- Peak queue pressure was highest in Demo 1 (`peakPendingTaskCount = 8`), which reflects the heavier queue buildup during sustained load.
 
 ## Comparison with Standard Executors
 
@@ -908,6 +1017,7 @@ Its main value is not raw performance, but:
 - configurable architecture
 - demonstration of concurrency concepts
 - ability to experiment with internal behavior
+
 
 ---
 
@@ -1010,6 +1120,20 @@ A production-ready version could expose:
 The current API is intentionally small.
 
 A more complete implementation could support more of the standard `ExecutorService` behavior, including richer shutdown and task management methods.
+
+### 9. Add automated benchmarking
+
+The current project already provides basic runtime metrics collected during demo scenarios.
+
+A future version could extend this with repeatable benchmark runs, for example:
+
+- fixed task counts
+- multiple configurations
+- repeated runs per configuration
+- averaged throughput and rejection rate
+- structured export of benchmark results
+
+This would make the performance analysis more rigorous and easier to compare across configurations.
 
 ---
 
