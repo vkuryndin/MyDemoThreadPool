@@ -1266,20 +1266,21 @@ For an educational report, it is acceptable to describe these expected trade-off
 ### Example measured results
 
 #### Main demo scenarios
-
 | Scenario | Submitted | Accepted | Rejected | Completed | Current Workers | Peak Workers | Peak Pending | Duration (s) | Accepted Throughput (tasks/s) | Completed Throughput (tasks/s) | Rejection Rate |
 |----------|-----------|----------|----------|-----------|-----------------|--------------|--------------|--------------|-------------------------------|--------------------------------|----------------|
-| Demo 1: execute() + overload + shutdown() | 12 | 12 | 0 | 12 | 0 | 4 | 8 | 17.016 | 0.705 | 0.705 | 0.00% |
-| Demo 2: submit() + Future | 3 | 3 | 0 | 3 | 2 | 2 | 2 | 6.015 | 0.499 | 0.499 | 0.00% |
-| Demo 3: shutdownNow() | 8 | 8 | 0 | 3 | 0 | 3 | 6 | 7.025 | 1.139 | 0.427 | 0.00% |
+| Demo 1: execute() + overload + shutdown() | 12 | 12 | 0 | 12 | 0 | 4 | 8 | 17.031 | 0.705 | 0.705 | 0.00% |
+| Demo 2: submit() + Future | 3 | 3 | 0 | 3 | 1 | 2 | 2 | 6.031 | 0.497 | 0.497 | 0.00% |
+| Demo 3: shutdownNow() | 8 | 8 | 0 | 3 | 0 | 3 | 6 | 7.027 | 1.138 | 0.427 | 0.00% |
+
 
 #### Configuration comparison results
-
 | Configuration | corePoolSize | maxPoolSize | queueSize | minSpareThreads | Submitted | Accepted | Rejected | Completed | Current Workers | Peak Workers | Peak Pending | Duration (s) | Accepted Throughput (tasks/s) | Completed Throughput (tasks/s) | Rejection Rate |
 |---------------|--------------|-------------|-----------|-----------------|-----------|----------|----------|-----------|-----------------|--------------|--------------|--------------|-------------------------------|--------------------------------|----------------|
-| Config A (small) | 1 | 2 | 1 | 0 | 20 | 4 | 16 | 4 | 0 | 2 | 2 | 10.007 | 0.400 | 0.400 | 80.00% |
-| Config B (medium) | 2 | 4 | 2 | 1 | 20 | 12 | 8 | 12 | 0 | 4 | 8 | 10.016 | 1.198 | 1.198 | 40.00% |
-| Config C (large) | 3 | 6 | 4 | 1 | 20 | 20 | 0 | 17 | 3 | 5 | 16 | 10.006 | 1.999 | 1.699 | 0.00% |
+| Config A (small) | 1 | 2 | 1 | 0 | 20 | 4 | 16 | 4 | 0 | 2 | 2 | 10.003 | 0.400 | 0.400 | 80.00% |
+| Config B (medium) | 2 | 4 | 2 | 1 | 20 | 12 | 8 | 12 | 0 | 4 | 8 | 10.015 | 1.198 | 1.198 | 40.00% |
+| Config C (large) | 3 | 6 | 4 | 1 | 20 | 20 | 0 | 17 | 3 | 5 | 16 | 10.014 | 1.997 | 1.698 | 0.00% |
+
+### Observations from measured results
 
 ### Observations from measured results
 
@@ -1287,8 +1288,9 @@ For an educational report, it is acceptable to describe these expected trade-off
 
 - In Demo 1, the default configuration successfully handled all 12 submitted tasks without rejections and scaled up to 4 workers.
 - In Demo 2, the pool correctly processed all `Callable` tasks and returned all `Future` results with no rejection.
+- In Demo 2, the metrics snapshot was taken slightly before the last worker fully terminated, which is why `currentWorkerCount = 1` in the summary even though the remaining worker stopped immediately afterward.
 - In Demo 3, immediate shutdown clearly changed the outcome: all 8 tasks were accepted, but only 3 were completed because the remaining pending tasks were removed from queues during `shutdownNow()`.
-- Demo 3 also shows that accepted throughput and completed throughput may differ significantly when the shutdown mode interrupts normal execution.
+- Demo 3 also shows that accepted throughput and completed throughput may differ significantly when immediate shutdown interrupts normal execution.
 
 #### Observations from the configuration comparison
 
@@ -1297,7 +1299,7 @@ For an educational report, it is acceptable to describe these expected trade-off
 - Config B (medium) provided a more balanced result: it accepted 12 of 20 tasks and rejected 40%.
 - Config C (large) accepted all 20 submitted tasks and reached the highest accepted throughput.
 - Config C also produced the highest peak queue pressure (`peakPendingTaskCount = 16`), which shows that larger configurations can buffer much more work before rejecting tasks.
-- In Config C, the metrics snapshot was taken before the last tasks and workers had fully completed, which is why the snapshot shows `completedTaskCount = 17` and `currentWorkerCount = 3` even though the remaining tasks finished shortly after.
+- In Config C, the metrics snapshot was taken before the last tasks and workers had fully completed, which is why the summary still shows `completedTaskCount = 17` and `currentWorkerCount = 3` even though the remaining tasks finished shortly after.
 - Overall, the measured data confirms that larger values of `corePoolSize`, `maxPoolSize`, and `queueSize` improve acceptance rate and throughput, but also allow more work to accumulate inside the pool.
 
 ### Suggested interpretation of the measured study
