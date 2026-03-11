@@ -681,33 +681,30 @@ This makes the demo not only illustrative, but also measurable.
 
 The project includes a demonstration class `Main` that shows the behavior of the custom thread pool in several scenarios.
 
-### Demo 1: `execute()` + `overload` + `shutdown()`
+In addition to normal logs, each scenario prints a **metrics summary** at the end.  
+This summary includes task counters, worker statistics, queue pressure, total duration, throughput, and rejection rate.
+
+### Demo 1: `execute()` + overload + `shutdown()`
 
 This scenario demonstrates:
+
 - normal execution of `Runnable` tasks
 - queue filling
 - pool growth up to `maxPoolSize`
-- rejection of tasks when overload happens
 - graceful shutdown
 - metrics collection for accepted, rejected, and completed tasks
 
-Several long-running `DemoTask` instances are submitted quickly.
-Because tasks take time to finish, worker queues become full, additional workers may be created, and eventually some tasks may be rejected.
+In the measured run:
 
-After that, `shutdown()` is called so that the pool can stop accepting new tasks while still finishing already accepted work.
+- all 12 submitted tasks were accepted
+- all 12 accepted tasks were completed
+- the pool scaled up to 4 workers
+- peak pending task count reached 8
+- rejection rate was 0%
 
-Typical metrics to observe in this scenario:
+This scenario shows that the default configuration can absorb this workload without task loss.
 
-- `submittedTaskCount`
-- `acceptedTaskCount`
-- `rejectedTaskCount`
-- `completedTaskCount`
-- `peakWorkerCount`
-- `peakPendingTaskCount`
-- accepted throughput
-- rejection rate
-
-This scenario is the most useful for observing overload behavior.
+---
 
 ### Demo 2: `submit()` + `Future`
 
@@ -719,19 +716,16 @@ This scenario demonstrates:
 - blocking behavior of `Future.get()`
 - metrics collection for accepted and completed tasks
 
-Several `DemoCallableTask` objects are submitted to the pool.
-Each task simulates work and then returns a readable result string.
+In the measured run:
 
-The demo then reads those results using 'future.get()'.
+- all 3 submitted tasks were accepted
+- all 3 tasks completed successfully
+- peak worker count remained 2
+- rejection rate was 0%
 
-Typical metrics to observe in this scenario:
+This scenario confirms that the pool correctly supports tasks with results.
 
-- accepted tasks
-- completed tasks
-- worker utilization
-- completed throughput
-
-This scenario is useful for confirming that the pool correctly supports tasks with results.
+---
 
 ### Demo 3: `shutdownNow()`
 
@@ -743,32 +737,83 @@ This scenario demonstrates:
 - interruption-aware task behavior
 - difference between accepted and completed tasks
 
-Several long-running tasks are submitted.
-After a short delay, `shutdownNow()` is called.
+In the measured run:
 
-At that point:
+- all 8 submitted tasks were accepted
+- only 3 tasks were completed
+- 5 pending tasks were cleared from worker queues during `shutdownNow()`
+- peak worker count reached 3
+- rejection rate was 0%
 
-- some tasks are already running
-- some tasks may still be waiting in queues
+This scenario clearly shows the difference between **accepted** work and **completed** work during immediate shutdown.
 
-The waiting tasks are cleared, and worker threads are interrupted.
-If the running tasks react to interruption correctly, they stop early and print interruption logs.
+---
 
-Typical metrics to observe in this scenario:
+### Demo 4: configuration comparison
 
-- accepted tasks
-- completed tasks
-- cleared pending tasks
-- rejection rate
-- final worker count after shutdown
+This scenario compares the behavior of the same workload under three different pool configurations.
 
-A particularly important observation here is that `acceptedTaskCount` may be greater than `completedTaskCount`, because some accepted tasks may still be removed from queues during `shutdownNow()` before they start executing.
+The same load was submitted to all three configurations:
+
+- 20 tasks
+- each task duration = 2000 ms
+- graceful shutdown after submission
+
+#### Config A (small)
+- `corePoolSize = 1`
+- `maxPoolSize = 2`
+- `queueSize = 1`
+- `minSpareThreads = 0`
+
+Measured result:
+
+- submitted: 20
+- accepted: 4
+- rejected: 16
+- completed: 4
+- peak workers: 2
+- rejection rate: 80%
+
+#### Config B (medium)
+- `corePoolSize = 2`
+- `maxPoolSize = 4`
+- `queueSize = 2`
+- `minSpareThreads = 1`
+
+Measured result:
+
+- submitted: 20
+- accepted: 12
+- rejected: 8
+- completed: 12
+- peak workers: 4
+- rejection rate: 40%
+
+#### Config C (large)
+- `corePoolSize = 3`
+- `maxPoolSize = 6`
+- `queueSize = 4`
+- `minSpareThreads = 1`
+
+Measured result:
+
+- submitted: 20
+- accepted: 20
+- rejected: 0
+- completed at snapshot time: 17
+- peak workers: 5
+- rejection rate: 0%
+
+This configuration comparison demonstrates how pool sizing and queue capacity directly affect acceptance rate, rejection rate, queue pressure, and throughput.
+
 
 ## Performance Notes
 
 This project was implemented primarily as an educational custom thread pool, not as a production-ready high-performance replacement for `ThreadPoolExecutor`.
 
 At the same time, the current version already includes **built-in runtime metrics**, which makes it possible to observe real pool behavior during demo execution instead of relying only on theoretical assumptions.
+
+A full performance study could be extended later with dedicated benchmarks, repeated runs, and averaged results, but even the current implementation already provides useful measurable data.
 
 ### Collected runtime metrics
 
@@ -811,6 +856,9 @@ Some metrics should be interpreted carefully:
 - `acceptedTaskCount` includes tasks that were successfully placed into queues
 - `completedTaskCount` includes only tasks that actually finished execution
 - during `shutdownNow()`, it is normal for `acceptedTaskCount` to be greater than `completedTaskCount`, because some accepted tasks may still be removed from queues before execution starts
+- if a metrics snapshot is taken before all workers fully terminate, `currentWorkerCount` and `completedTaskCount` may still reflect in-progress work
+
+This last point is visible in the measured data for the large configuration in Demo 4: the snapshot was taken before the final tasks and workers had fully finished, so the summary still showed active workers and incomplete task completion at that moment.
 
 ### Factors that influence performance in this implementation
 
@@ -883,7 +931,17 @@ If it is too low, sudden spikes may experience additional latency.
 If the timeout is too short, the pool may shrink too aggressively and recreate workers often.  
 If it is too long, unnecessary workers may remain alive longer than needed.
 
-### Example of mini-study approach
+### Practical observations
+
+For the current design, the most balanced configuration is usually one where:
+
+- `corePoolSize` covers normal load
+- `maxPoolSize` allows moderate burst handling
+- `queueSize` is large enough to absorb short spikes but not so large that tasks wait too long
+- `minSpareThreads` is small but non-zero
+- `keepAliveTime` is long enough to avoid frequent worker creation and destruction
+
+### Suggested mini-study approach
 
 A simple mini-study for this project can compare several configurations such as:
 
@@ -917,107 +975,68 @@ Expected result:
 - higher memory and thread management overhead
 - potentially more waiting inside queues
 
-### Suggested way to report measured results
-
-After running the demo scenarios, the collected metrics can be summarized in the report, for example:
-
-- number of submitted, accepted, rejected, and completed tasks
-- peak worker count reached under load
-- peak pending task count observed in queues
-- accepted throughput and completed throughput
-- rejection rate for overload scenarios
-- difference between graceful shutdown and immediate shutdown behavior
-
-This makes the performance section more evidence-based and better connected to the actual implementation.
+For an educational report, it is acceptable to describe these expected trade-offs even if full benchmarking is not performed. In this project, the comparison was supplemented with actual measured runtime metrics from demo scenarios.
 
 ### Example measured results
 
+#### Main demo scenarios
+
 | Scenario | Submitted | Accepted | Rejected | Completed | Current Workers | Peak Workers | Peak Pending | Duration (s) | Accepted Throughput (tasks/s) | Completed Throughput (tasks/s) | Rejection Rate |
 |----------|-----------|----------|----------|-----------|-----------------|--------------|--------------|--------------|-------------------------------|--------------------------------|----------------|
-| Demo 1: execute() + overload + shutdown() | 12 | 12 | 0 | 12 | 0 | 4 | 8 | 17.017 | 0.705 | 0.705 | 0.00% |
-| Demo 2: submit() + Future | 3 | 3 | 0 | 3 | 2 | 2 | 1 | 6.013 | 0.499 | 0.499 | 0.00% |
-| Demo 3: shutdownNow() | 8 | 8 | 0 | 3 | 0 | 3 | 6 | 7.024 | 1.139 | 0.427 | 0.00% |
+| Demo 1: execute() + overload + shutdown() | 12 | 12 | 0 | 12 | 0 | 4 | 8 | 17.016 | 0.705 | 0.705 | 0.00% |
+| Demo 2: submit() + Future | 3 | 3 | 0 | 3 | 2 | 2 | 2 | 6.015 | 0.499 | 0.499 | 0.00% |
+| Demo 3: shutdownNow() | 8 | 8 | 0 | 3 | 0 | 3 | 6 | 7.025 | 1.139 | 0.427 | 0.00% |
 
+#### Configuration comparison results
+
+| Configuration | corePoolSize | maxPoolSize | queueSize | minSpareThreads | Submitted | Accepted | Rejected | Completed | Current Workers | Peak Workers | Peak Pending | Duration (s) | Accepted Throughput (tasks/s) | Completed Throughput (tasks/s) | Rejection Rate |
+|---------------|--------------|-------------|-----------|-----------------|-----------|----------|----------|-----------|-----------------|--------------|--------------|--------------|-------------------------------|--------------------------------|----------------|
+| Config A (small) | 1 | 2 | 1 | 0 | 20 | 4 | 16 | 4 | 0 | 2 | 2 | 10.007 | 0.400 | 0.400 | 80.00% |
+| Config B (medium) | 2 | 4 | 2 | 1 | 20 | 12 | 8 | 12 | 0 | 4 | 8 | 10.016 | 1.198 | 1.198 | 40.00% |
+| Config C (large) | 3 | 6 | 4 | 1 | 20 | 20 | 0 | 17 | 3 | 5 | 16 | 10.006 | 1.999 | 1.699 | 0.00% |
 
 ### Observations from measured results
 
-- Demo 1 shows that the pool scaled up to 4 workers and completed all 12 accepted tasks during graceful shutdown.
-- Demo 2 confirms correct support for `Callable` tasks and `Future` results, with all submitted tasks completed successfully.
-- Demo 3 clearly demonstrates the effect of `shutdownNow()`: all 8 tasks were accepted, but only 3 tasks were completed because 5 pending tasks were cleared from queues during immediate shutdown.
-- The highest accepted throughput was observed in Demo 3, but completed throughput was much lower because immediate shutdown interrupted execution before all accepted tasks could finish.
-- Peak queue pressure was highest in Demo 1 (`peakPendingTaskCount = 8`), which reflects the heavier queue buildup during sustained load.
+#### Observations from the main demo scenarios
 
-## Comparison with Standard Executors
+- In Demo 1, the default configuration successfully handled all 12 submitted tasks without rejections and scaled up to 4 workers.
+- In Demo 2, the pool correctly processed all `Callable` tasks and returned all `Future` results with no rejection.
+- In Demo 3, immediate shutdown clearly changed the outcome: all 8 tasks were accepted, but only 3 were completed because the remaining pending tasks were removed from queues during `shutdownNow()`.
+- Demo 3 also shows that accepted throughput and completed throughput may differ significantly when the shutdown mode interrupts normal execution.
 
-This custom pool should not be considered a drop-in replacement for the standard Java executor implementations.
+#### Observations from the configuration comparison
 
-The standard library provides highly optimized and thoroughly tested solutions such as:
+- The comparison shows a strong dependency between pool capacity and rejection rate.
+- Config A (small) rejected 80% of submitted tasks, which shows that a very small pool and very small queues quickly become overloaded.
+- Config B (medium) provided a more balanced result: it accepted 12 of 20 tasks and rejected 40%.
+- Config C (large) accepted all 20 submitted tasks and reached the highest accepted throughput.
+- Config C also produced the highest peak queue pressure (`peakPendingTaskCount = 16`), which shows that larger configurations can buffer much more work before rejecting tasks.
+- In Config C, the metrics snapshot was taken before the last tasks and workers had fully completed, which is why the snapshot shows `completedTaskCount = 17` and `currentWorkerCount = 3` even though the remaining tasks finished shortly after.
+- Overall, the measured data confirms that larger values of `corePoolSize`, `maxPoolSize`, and `queueSize` improve acceptance rate and throughput, but also allow more work to accumulate inside the pool.
 
-- `ThreadPoolExecutor`
-- `Executors.newFixedThreadPool(...)`
-- `Executors.newCachedThreadPool(...)`
+### Suggested interpretation of the measured study
 
-These standard implementations are generally more robust and better optimized for real production use.
+The measured results support the following general conclusion:
 
-### Advantages of the custom implementation
+- smaller configurations fail earlier under burst load
+- medium configurations provide a compromise between resource usage and acceptance rate
+- larger configurations minimize rejection and maximize throughput, but may accumulate much larger pending queues
 
-Compared with standard executors, this project has some educational and architectural advantages:
+This makes configuration tuning an important part of thread pool design.
 
-- internal behavior is fully visible
-- worker lifecycle is easy to trace
-- queue ownership is explicit
-- overload handling is easy to customize
-- task balancing strategy is replaceable
-- logging clearly shows what happens inside the system
+### Performance analysis summary
 
-These qualities make the project useful for learning and demonstration.
+Compared with a purely theoretical discussion, the measured metrics make it possible to connect configuration directly to runtime behavior.
 
-### Limitations compared with `ThreadPoolExecutor`
+The collected results show that:
 
-Compared with standard executors, the custom pool has several limitations:
+- graceful shutdown preserves accepted work and allows full completion of already queued tasks
+- immediate shutdown may leave a significant gap between accepted and completed work
+- queue size and maximum worker count strongly affect overload resistance
+- larger configurations increase throughput and acceptance capacity
+- smaller configurations are more resource-efficient, but reject burst traffic much earlier
 
-- it is not heavily optimized
-- it uses simpler synchronization
-- it does not provide the full `ExecutorService` API
-- it does not include advanced monitoring or tuning tools
-- it uses console logging instead of a full logging subsystem
-- it was not benchmarked against industrial-grade implementations
-
-### Comparison with Tomcat / Jetty style server pools
-
-Application servers such as Tomcat or Jetty use mature, production-oriented thread management strategies.
-
-Compared with those systems, this implementation is much simpler.
-
-Tomcat- and Jetty-style executors typically provide:
-
-- better tuning for server workloads
-- more advanced metrics and diagnostics
-- more mature queue and scheduling behavior
-- stronger production stability
-- years of testing and optimization
-
-However, the core ideas are similar:
-
-- tasks are executed by worker threads
-- queue capacity matters
-- overload must be handled explicitly
-- shutdown behavior must be well-defined
-- configuration strongly affects runtime behavior
-
-So while this project is far simpler, it still models the same important concepts.
-
-### Main conclusion of the comparison
-
-The custom pool is worse than standard library or server-grade executors in terms of maturity, optimization, and reliability.
-
-Its main value is not raw performance, but:
-
-- educational transparency
-- configurable architecture
-- demonstration of concurrency concepts
-- ability to experiment with internal behavior
-
+For an educational custom thread pool, this level of performance analysis is sufficient to demonstrate both the implementation logic and the practical effect of configuration choices.
 
 ---
 
@@ -1153,6 +1172,7 @@ The implementation supports:
 - `Runnable` task execution
 - `Callable` task submission with `Future`
 - detailed lifecycle logging
+- built-in runtime metrics
 
 Although the implementation is simpler than standard library executors or production-grade server pools, it successfully demonstrates the main mechanisms required by the task.
 
@@ -1164,4 +1184,12 @@ The most important result of the project is not maximum performance, but a clear
 - how shutdown modes differ
 - how configuration affects runtime behavior
 
-As an educational implementation, this project fulfills the assignment goals and provides a good foundation for further experiments with concurrency and custom executor design.
+The measured demo scenarios also show that configuration has a direct and visible effect on:
+
+- acceptance rate
+- rejection rate
+- throughput
+- worker scaling
+- queue pressure
+
+As an educational implementation, this project fulfills the assignment goals and provides a good foundation for further experiments with concurrency, configuration tuning, and custom executor design.

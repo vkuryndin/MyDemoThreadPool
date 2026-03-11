@@ -40,6 +40,11 @@ public class Main {
 
         runShutdownNowDemo();
 
+        //added new demo here
+        Thread.sleep(3000);
+
+        runConfigurationComparisonDemo();
+
         System.out.println("\n=== All demos finished ===");
     }
 
@@ -189,8 +194,77 @@ public class Main {
         long endNanos = System.nanoTime();
         printMetricsSummary("DEMO 3", pool, startNanos, endNanos);
     }
+
     /**
-     * Creates a demo pool with the same configuration for all scenarios.
+     * Demonstrates how the same load behaves under different pool configurations.
+     *
+     * This scenario runs the same number of tasks with the same task duration
+     * against several pool configurations and prints metrics for each case.
+     *
+     * @throws InterruptedException if the main thread is interrupted
+     */
+    private static void runConfigurationComparisonDemo() throws InterruptedException {
+        System.out.println("\n==============================");
+        System.out.println("DEMO 4: configuration comparison");
+        System.out.println("==============================");
+
+        /**
+         * The same workload will be submitted to all configurations.
+         *
+         * We intentionally use many tasks submitted quickly so that
+         * differences in queue capacity and worker scaling become visible.
+         */
+        int taskCount = 20;
+        long taskDurationMillis = 2000;
+        long waitAfterShutdownMillis = 10000;
+
+        /**
+         * Small configuration:
+         * - low core size
+         * - low max size
+         * - small queue
+         *
+         * Expected behavior:
+         * more rejection and lower peak capacity.
+         */
+        runSingleConfigurationCase(
+                "Config A (small)",
+                new PoolConfig(1, 2, 5, TimeUnit.SECONDS, 1, 0),
+                taskCount,
+                taskDurationMillis,
+                waitAfterShutdownMillis
+        );
+
+        /**
+         * Medium configuration:
+         * balanced settings close to the main demo pool.
+         */
+        runSingleConfigurationCase(
+                "Config B (medium)",
+                new PoolConfig(2, 4, 5, TimeUnit.SECONDS, 2, 1),
+                taskCount,
+                taskDurationMillis,
+                waitAfterShutdownMillis
+        );
+
+        /**
+         * Larger configuration:
+         * more workers and larger queues.
+         *
+         * Expected behavior:
+         * fewer rejections and higher acceptance capacity.
+         */
+        runSingleConfigurationCase(
+                "Config C (large)",
+                new PoolConfig(3, 6, 5, TimeUnit.SECONDS, 4, 1),
+                taskCount,
+                taskDurationMillis,
+                waitAfterShutdownMillis
+        );
+    }
+
+    /**
+     * Creates a demo pool with the default configuration used in main scenarios.
      *
      * @param poolName logical pool name
      * @return a configured CustomThreadPool
@@ -205,12 +279,7 @@ public class Main {
                 1
         );
 
-        return new CustomThreadPool(
-                poolName,
-                config,
-                new RoundRobinBalancer(),
-                new RejectPolicy()
-        );
+        return createPool(poolName, config);
     }
 
     /**
@@ -274,5 +343,73 @@ public class Main {
         System.out.printf("Accepted throughput  : %.3f tasks/sec%n", acceptedThroughput);
         System.out.printf("Completed throughput : %.3f tasks/sec%n", completedThroughput);
         System.out.printf("Rejection rate       : %.2f%%%n", rejectionRate);
+    }
+    /**
+     * Runs one load case for one specific pool configuration.
+     *
+     * @param caseName readable configuration label
+     * @param config pool configuration
+     * @param taskCount number of tasks to submit
+     * @param taskDurationMillis duration of each task
+     * @param waitAfterShutdownMillis wait time after shutdown
+     * @throws InterruptedException if the main thread is interrupted
+     */
+    private static void runSingleConfigurationCase(String caseName,
+                                                   PoolConfig config,
+                                                   int taskCount,
+                                                   long taskDurationMillis,
+                                                   long waitAfterShutdownMillis) throws InterruptedException {
+        System.out.println("\n----- " + caseName + " -----");
+        System.out.println("corePoolSize=" + config.getCorePoolSize()
+                + ", maxPoolSize=" + config.getMaxPoolSize()
+                + ", queueSize=" + config.getQueueSize()
+                + ", minSpareThreads=" + config.getMinSpareThreads());
+
+        CustomThreadPool pool = createPool(caseName.replace(" ", "") + "Pool", config);
+
+        long startNanos = System.nanoTime();
+
+        /**
+         * Submit the same workload for every configuration.
+         */
+        for (int i = 1; i <= taskCount; i++) {
+            DemoTask task = new DemoTask(caseName + "-Task-" + i, taskDurationMillis);
+
+            try {
+                pool.execute(task);
+            } catch (RejectedExecutionException e) {
+                System.out.println("[Main] Submission failed for " + task + ": " + e.getMessage());
+            }
+        }
+
+        /**
+         * Graceful shutdown is used so that all accepted tasks
+         * have a chance to complete.
+         */
+        pool.shutdown();
+
+        /**
+         * Wait long enough for accepted tasks to finish.
+         */
+        Thread.sleep(waitAfterShutdownMillis);
+
+        long endNanos = System.nanoTime();
+
+        printMetricsSummary(caseName, pool, startNanos, endNanos);
+    }
+    /**
+     * Creates a pool with a custom configuration.
+     *
+     * @param poolName logical pool name
+     * @param config pool configuration
+     * @return configured custom thread pool
+     */
+    private static CustomThreadPool createPool(String poolName, PoolConfig config) {
+        return new CustomThreadPool(
+                poolName,
+                config,
+                new RoundRobinBalancer(),
+                new RejectPolicy()
+        );
     }
 }
