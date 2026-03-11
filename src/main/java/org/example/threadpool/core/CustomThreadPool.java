@@ -9,6 +9,9 @@ import org.example.threadpool.rejection.RejectionPolicy;
 import org.example.threadpool.worker.Worker;
 import org.example.threadpool.worker.WorkerController;
 
+import org.example.threadpool.metrics.PoolMetricsSnapshot;
+
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
@@ -82,6 +85,94 @@ public class CustomThreadPool implements CustomExecutor, WorkerController {
     private volatile boolean shutdownNow;
 
     /**
+     * Total number of tasks submitted to the pool.
+     *
+     * This includes both accepted and rejected tasks.
+     */
+    private final AtomicLong submittedTaskCount = new AtomicLong(0);
+
+    /**
+     * Total number of tasks accepted by the pool.
+     */
+    private final AtomicLong acceptedTaskCount = new AtomicLong(0);
+
+    /**
+     * Total number of tasks rejected by the pool.
+     */
+    private final AtomicLong rejectedTaskCount = new AtomicLong(0);
+
+    /**
+     * Total number of tasks whose execution has finished.
+     *
+     * A task is counted as completed even if it ended with an exception.
+     */
+    private final AtomicLong completedTaskCount = new AtomicLong(0);
+
+    /**
+     * Peak number of workers observed since pool creation.
+     */
+    private final AtomicLong peakWorkerCount = new AtomicLong(0);
+
+    /**
+     * Peak total number of pending tasks in all worker queues.
+     */
+    private final AtomicLong peakPendingTaskCount = new AtomicLong(0);
+
+    /**
+     * Internal wrapper around a task that increments the completed counter
+     * when task execution finishes.
+     *
+     * The wrapper delegates toString() to the original task so that logs
+     * remain readable.
+     */
+    private static class TrackedTask implements Runnable {
+
+        /**
+         * The original user task.
+         */
+        private final Runnable delegate;
+
+        /**
+         * Counter of completed tasks.
+         */
+        private final AtomicLong completedTaskCounter;
+
+        /**
+         * Creates a new tracked task wrapper.
+         *
+         * @param delegate the original task
+         * @param completedTaskCounter counter for completed tasks
+         */
+        public TrackedTask(Runnable delegate, AtomicLong completedTaskCounter) {
+            this.delegate = delegate;
+            this.completedTaskCounter = completedTaskCounter;
+        }
+
+        /**
+         * Executes the original task and increments the completed counter
+         * when execution finishes.
+         */
+        @Override
+        public void run() {
+            try {
+                delegate.run();
+            } finally {
+                completedTaskCounter.incrementAndGet();
+            }
+        }
+
+        /**
+         * Delegates readable text representation to the original task.
+         *
+         * @return original task text
+         */
+        @Override
+        public String toString() {
+            return delegate.toString();
+        }
+    }
+
+    /**
      * Creates a new custom thread pool and immediately starts core workers.
      *
      * @param poolName logical pool name used in worker thread names
@@ -147,6 +238,7 @@ public class CustomThreadPool implements CustomExecutor, WorkerController {
             Thread thread = threadFactory.newThread(worker);
 
             workers.add(worker);
+            updatePeakWorkerCount(workers.size());
             workerThreads.put(worker, thread);
 
             thread.start();
@@ -214,6 +306,31 @@ public class CustomThreadPool implements CustomExecutor, WorkerController {
     }
 
     /**
+     * Returns an immutable snapshot of current pool metrics.
+     *
+     * @return current metrics snapshot
+     */
+    public PoolMetricsSnapshot getMetricsSnapshot() {
+        int currentWorkers = getWorkerCount();
+        int busyWorkers = getBusyWorkerCount();
+        int idleWorkers = currentWorkers - busyWorkers;
+        long currentPending = getTotalPendingTaskCount();
+
+        return new PoolMetricsSnapshot(
+                submittedTaskCount.get(),
+                acceptedTaskCount.get(),
+                rejectedTaskCount.get(),
+                completedTaskCount.get(),
+                currentWorkers,
+                busyWorkers,
+                idleWorkers,
+                peakWorkerCount.get(),
+                currentPending,
+                peakPendingTaskCount.get()
+        );
+    }
+
+    /**
      * Tries to assign a task to one of the existing workers.
      *
      * The balancer selects the starting queue index, and then the pool
@@ -237,12 +354,94 @@ public class CustomThreadPool implements CustomExecutor, WorkerController {
             Worker worker = snapshot.get(index);
 
             if (worker.offerTask(command)) {
+                recordTaskAccepted();
                 System.out.println("[Pool] Task accepted into queue #" + index + ": " + command);
                 return true;
             }
         }
 
         return false;
+    }
+
+    /**
+     * Wraps a task so that pool metrics can count completed executions.
+     *
+     * @param command original task
+     * @return wrapped task
+     */
+    private Runnable wrapWithMetrics(Runnable command) {
+        return new TrackedTask(command, completedTaskCount);
+    }
+
+    /**
+     * Updates the peak worker count if the observed value is greater.
+     *
+     * @param observedWorkerCount current observed worker count
+     */
+    private void updatePeakWorkerCount(long observedWorkerCount) {
+        while (true) {
+            long currentPeak = peakWorkerCount.get();
+
+            if (observedWorkerCount <= currentPeak) {
+                return;
+            }
+
+            if (peakWorkerCount.compareAndSet(currentPeak, observedWorkerCount)) {
+                return;
+            }
+        }
+    }
+
+    /**
+     * Returns the current total number of pending tasks in all worker queues.
+     *
+     * @return total pending task count
+     */
+    private long getTotalPendingTaskCount() {
+        long totalPending = 0;
+
+        for (Worker worker : workers) {
+            totalPending += worker.getQueueSize();
+        }
+
+        return totalPending;
+    }
+
+    /**
+     * Updates the peak pending task count based on the current queue load.
+     */
+    private void updatePeakPendingTaskCount() {
+        long observedPending = getTotalPendingTaskCount();
+
+        while (true) {
+            long currentPeak = peakPendingTaskCount.get();
+
+            if (observedPending <= currentPeak) {
+                return;
+            }
+
+            if (peakPendingTaskCount.compareAndSet(currentPeak, observedPending)) {
+                return;
+            }
+        }
+    }
+
+    /**
+     * Increments the accepted task counter and refreshes peak pending load.
+     */
+    private void recordTaskAccepted() {
+        acceptedTaskCount.incrementAndGet();
+        updatePeakPendingTaskCount();
+    }
+
+    /**
+     * Increments the rejected task counter and applies rejection policy.
+     *
+     * @param task the rejected task
+     */
+    private void rejectTask(Runnable task) {
+        rejectedTaskCount.incrementAndGet();
+        rejectionPolicy.reject(task);
     }
 
 
@@ -307,12 +506,16 @@ public class CustomThreadPool implements CustomExecutor, WorkerController {
             throw new IllegalArgumentException("command cannot be null");
         }
 
+        submittedTaskCount.incrementAndGet();
+
+        Runnable trackedCommand = wrapWithMetrics(command);
+
         synchronized (stateLock) {
             /**
              * The pool must not accept new tasks after shutdown starts.
              */
             if (shutdown || shutdownNow) {
-                rejectionPolicy.reject(command);
+                rejectTask(trackedCommand);
                 return;
             }
 
@@ -324,7 +527,7 @@ public class CustomThreadPool implements CustomExecutor, WorkerController {
             /**
              * First try to place the task into one of the existing worker queues.
              */
-            if (tryAssignTaskToExistingWorker(command)) {
+            if (tryAssignTaskToExistingWorker(trackedCommand)) {
                 return;
             }
 
@@ -334,10 +537,11 @@ public class CustomThreadPool implements CustomExecutor, WorkerController {
             if (canCreateMoreWorkers()) {
                 Worker newWorker = createAndStartWorker();
 
-                if (newWorker.offerTask(command)) {
+                if (newWorker.offerTask(trackedCommand)) {
                     int index = workers.indexOf(newWorker);
+                    recordTaskAccepted();
                     System.out.println("[Pool] Task accepted into newly created queue #"
-                            + index + ": " + command);
+                            + index + ": " + trackedCommand);
                     return;
                 }
             }
@@ -345,7 +549,7 @@ public class CustomThreadPool implements CustomExecutor, WorkerController {
             /**
              * If nothing helped, apply the overload policy.
              */
-            rejectionPolicy.reject(command);
+            rejectTask(trackedCommand);
         }
     }
     /**

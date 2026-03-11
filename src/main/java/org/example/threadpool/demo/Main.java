@@ -4,6 +4,7 @@ import org.example.threadpool.balancer.RoundRobinBalancer;
 import org.example.threadpool.config.PoolConfig;
 import org.example.threadpool.core.CustomThreadPool;
 import org.example.threadpool.rejection.RejectPolicy;
+import org.example.threadpool.metrics.PoolMetricsSnapshot;
 
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -53,6 +54,7 @@ public class Main {
         System.out.println("==============================");
 
         CustomThreadPool pool = createDemoPool("ExecuteDemoPool");
+        long startNanos = System.nanoTime();
 
         /**
          * Submit many long-running tasks quickly.
@@ -90,6 +92,9 @@ public class Main {
          * Wait so that accepted tasks can finish.
          */
         Thread.sleep(10000);
+
+        long endNanos = System.nanoTime();
+        printMetricsSummary("DEMO 1", pool, startNanos, endNanos);
     }
 
     /**
@@ -103,6 +108,7 @@ public class Main {
         System.out.println("==============================");
 
         CustomThreadPool pool = createDemoPool("SubmitDemoPool");
+        long startNanos = System.nanoTime();
 
         /**
          * Submit several Callable tasks and store the returned futures.
@@ -127,6 +133,9 @@ public class Main {
         pool.shutdown();
 
         Thread.sleep(3000);
+
+        long endNanos = System.nanoTime();
+        printMetricsSummary("DEMO 2", pool, startNanos, endNanos);
     }
 
     /**
@@ -141,6 +150,7 @@ public class Main {
         System.out.println("==============================");
 
         CustomThreadPool pool = createDemoPool("ShutdownNowDemoPool");
+        long startNanos = System.nanoTime();
 
         /**
          * Submit several long-running tasks.
@@ -175,8 +185,10 @@ public class Main {
          * Wait to observe interruption logs.
          */
         Thread.sleep(5000);
-    }
 
+        long endNanos = System.nanoTime();
+        printMetricsSummary("DEMO 3", pool, startNanos, endNanos);
+    }
     /**
      * Creates a demo pool with the same configuration for all scenarios.
      *
@@ -217,5 +229,50 @@ public class Main {
         } catch (ExecutionException e) {
             System.out.println("[Main] " + futureName + " failed: " + e.getCause());
         }
+    }
+
+    /**
+     * Prints a readable summary of pool metrics for one demo scenario.
+     *
+     * @param demoName readable scenario name
+     * @param pool the pool whose metrics should be printed
+     * @param startNanos scenario start time in nanoseconds
+     * @param endNanos scenario end time in nanoseconds
+     */
+    private static void printMetricsSummary(String demoName,
+                                            CustomThreadPool pool,
+                                            long startNanos,
+                                            long endNanos) {
+        PoolMetricsSnapshot metrics = pool.getMetricsSnapshot();
+
+        double durationSeconds = (endNanos - startNanos) / 1_000_000_000.0;
+
+        double acceptedThroughput = durationSeconds > 0
+                ? metrics.getAcceptedTaskCount() / durationSeconds
+                : 0.0;
+
+        double completedThroughput = durationSeconds > 0
+                ? metrics.getCompletedTaskCount() / durationSeconds
+                : 0.0;
+
+        double rejectionRate = metrics.getSubmittedTaskCount() > 0
+                ? (metrics.getRejectedTaskCount() * 100.0) / metrics.getSubmittedTaskCount()
+                : 0.0;
+
+        System.out.println("\n----- " + demoName + " metrics summary -----");
+        System.out.println("Submitted tasks      : " + metrics.getSubmittedTaskCount());
+        System.out.println("Accepted tasks       : " + metrics.getAcceptedTaskCount());
+        System.out.println("Rejected tasks       : " + metrics.getRejectedTaskCount());
+        System.out.println("Completed tasks      : " + metrics.getCompletedTaskCount());
+        System.out.println("Current workers      : " + metrics.getCurrentWorkerCount());
+        System.out.println("Busy workers         : " + metrics.getBusyWorkerCount());
+        System.out.println("Idle workers         : " + metrics.getIdleWorkerCount());
+        System.out.println("Peak workers         : " + metrics.getPeakWorkerCount());
+        System.out.println("Current pending tasks: " + metrics.getCurrentPendingTaskCount());
+        System.out.println("Peak pending tasks   : " + metrics.getPeakPendingTaskCount());
+        System.out.printf("Duration (seconds)   : %.3f%n", durationSeconds);
+        System.out.printf("Accepted throughput  : %.3f tasks/sec%n", acceptedThroughput);
+        System.out.printf("Completed throughput : %.3f tasks/sec%n", completedThroughput);
+        System.out.printf("Rejection rate       : %.2f%%%n", rejectionRate);
     }
 }

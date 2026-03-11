@@ -708,59 +708,6 @@ At that point:
 The waiting tasks are cleared, and worker threads are interrupted.
 If the running tasks react to interruption correctly, they stop early and print interruption logs.
 
-## How to Run
-### Requirements
-
-To run the project, you need:
-
-- Java 17 or newer
-- Gradle
-
-### Compile the project
-
-If the project uses Gradle wrapper:
-
-./gradlew build
-
-On Windows:
-
-gradlew.bat build
-Run the demo program
-
-If the main class is configured properly in Gradle, you can run the demo with:
-
-./gradlew run
-
-On Windows:
-
-gradlew.bat run
-
-If needed, the project can also be started directly from an IDE by running:
-
-com.example.threadpool.demo.Main
-
-What to expect in the console
-
-When the demo runs, the console should show:
-
-worker thread creation
-
-task submission
-
-task execution
-
-overload rejection
-
-graceful shutdown logs
-
-Future results
-
-interruption during shutdownNow()
-
-worker termination
-
-This output serves as the main demonstration of correctness for the project.
-
 
 ## Performance Notes
 
