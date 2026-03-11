@@ -174,10 +174,19 @@ This allows the pool to grow under load and shrink back when the extra workers a
                     ├── config
                     │   └── PoolConfigTest.java
                     ├── core
+                    │   ├── CustomThreadPoolConcurrentSubmissionTest.java
+                    │   ├── CustomThreadPoolCoreWorkerIdleTimeoutTest.java
                     │   ├── CustomThreadPoolExecuteTest.java
+                    │   ├── CustomThreadPoolGracefulShutdownTest.java
+                    │   ├── CustomThreadPoolGrowthTest.java
+                    │   ├── CustomThreadPoolIdleTimeoutTest.java
+                    │   ├── CustomThreadPoolMaxPoolSizeLimitTest.java
+                    │   ├── CustomThreadPoolMetricsTest.java
+                    │   ├── CustomThreadPoolReuseAfterShrinkTest.java
+                    │   ├── CustomThreadPoolShutdownNowMetricsTest.java
+                    │   ├── CustomThreadPoolShutdownNowQueueClearBehaviorTest.java
                     │   ├── CustomThreadPoolShutdownTest.java
                     │   └── CustomThreadPoolSubmitTest.java
-                    │   └── CustomThreadPoolGracefulShutdownTest.java
                     ├── factory
                     │   └── CustomThreadFactoryTest.java
                     └── rejection
@@ -854,6 +863,234 @@ Measured result:
 - rejection rate: 0%
 
 This configuration comparison demonstrates how pool sizing and queue capacity directly affect acceptance rate, rejection rate, queue pressure, and throughput.
+
+## Test Coverage Overview
+
+The project includes a set of unit and concurrency-oriented tests that validate the main parts of the custom thread pool implementation.
+
+The test suite was designed step by step, starting from simple deterministic components and then moving to more complex multithreaded scenarios.
+
+### What is covered by tests
+
+#### 1. Configuration validation
+
+`PoolConfigTest` verifies that:
+
+- valid configuration is created correctly
+- invalid values are rejected
+- constructor validation works as expected
+
+This includes checks for:
+
+- invalid `corePoolSize`
+- invalid `maxPoolSize`
+- negative `keepAliveTime`
+- `null` `timeUnit`
+- invalid `queueSize`
+- invalid `minSpareThreads`
+
+---
+
+#### 2. Balancer behavior
+
+`RoundRobinBalancerTest` verifies that:
+
+- queue indexes are returned in circular order
+- single-queue behavior is correct
+- invalid queue count values are rejected
+
+This confirms the correctness of the default balancing strategy.
+
+---
+
+#### 3. Rejection policy
+
+`RejectPolicyTest` verifies that:
+
+- rejected tasks cause `RejectedExecutionException`
+
+This confirms that overload handling works according to the selected rejection strategy.
+
+---
+
+#### 4. Thread factory behavior
+
+`CustomThreadFactoryTest` verifies that:
+
+- invalid pool names are rejected
+- created thread names are correct
+- thread names are unique and increment properly
+
+This ensures readable and deterministic worker thread naming.
+
+---
+
+#### 5. Task submission with results
+
+`CustomThreadPoolSubmitTest` verifies that:
+
+- `submit(Callable<T>)` returns a valid `Future`
+- `Future.get()` returns the expected result
+- multiple submitted tasks are executed correctly
+
+This confirms correct support for `Callable` tasks and `Future`-based result handling.
+
+---
+
+#### 6. Runnable execution
+
+`CustomThreadPoolExecuteTest` verifies that:
+
+- `execute(Runnable)` really executes submitted tasks
+- multiple `Runnable` tasks can be completed successfully
+
+This confirms the basic execution behavior of the pool.
+
+---
+
+#### 7. Shutdown contract
+
+`CustomThreadPoolShutdownTest` verifies that:
+
+- `execute()` rejects new tasks after `shutdown()`
+- `execute()` rejects new tasks after `shutdownNow()`
+- `submit()` rejects new tasks after `shutdown()`
+- `submit()` rejects new tasks after `shutdownNow()`
+
+This confirms that shutdown state prevents acceptance of new work.
+
+---
+
+#### 8. Graceful shutdown semantics
+
+`CustomThreadPoolGracefulShutdownTest` verifies that:
+
+- tasks accepted before `shutdown()` are still allowed to complete
+- queued tasks are not lost during graceful shutdown
+- new tasks submitted after shutdown are rejected
+
+This confirms the intended semantics of graceful shutdown.
+
+---
+
+#### 9. Runtime metrics
+
+`CustomThreadPoolMetricsTest` verifies that:
+
+- successful execution updates submitted / accepted / completed counters correctly
+- rejected submissions update submitted / rejected counters correctly
+
+This confirms that internal pool metrics remain consistent in simple scenarios.
+
+---
+
+#### 10. Immediate shutdown metrics behavior
+
+`CustomThreadPoolShutdownNowMetricsTest` verifies that:
+
+- during `shutdownNow()`, accepted tasks may be greater than completed tasks
+- queued tasks may be removed before execution
+- pending queue count becomes zero after immediate shutdown
+
+This confirms the difference between accepted work and completed work during forced shutdown.
+
+---
+
+#### 11. Pool growth behavior
+
+`CustomThreadPoolGrowthTest` verifies that:
+
+- the pool can grow above `corePoolSize` when capacity is exhausted
+
+`CustomThreadPoolMaxPoolSizeLimitTest` verifies that:
+
+- the pool does not grow beyond `maxPoolSize`
+- extra tasks are rejected when all workers and queues are already full
+
+Together, these tests confirm correct worker growth behavior and correct upper-capacity limits.
+
+---
+
+#### 12. Idle timeout behavior
+
+`CustomThreadPoolIdleTimeoutTest` verifies that:
+
+- extra workers created under load can stop after being idle longer than `keepAliveTime`
+- the pool shrinks back to `corePoolSize`
+
+`CustomThreadPoolCoreWorkerIdleTimeoutTest` verifies that:
+
+- core workers do not stop because of idle timeout
+
+These tests are especially important because they validate one of the most concurrency-sensitive parts of the implementation.
+
+---
+
+#### 13. Reuse after shrink-back
+
+`CustomThreadPoolReuseAfterShrinkTest` verifies that:
+
+- after growing above `corePoolSize`
+- and then shrinking back after idle timeout
+- the pool still remains usable and can execute new tasks correctly
+
+This confirms that worker lifecycle transitions do not break later task execution.
+
+---
+
+#### 14. Queue clearing behavior during `shutdownNow()`
+
+`CustomThreadPoolShutdownNowQueueClearBehaviorTest` verifies that:
+
+- a queued task is not executed if `shutdownNow()` clears the queue before that task starts
+
+This is a behavioral confirmation of the immediate-shutdown semantics.
+
+---
+
+#### 15. Concurrent submission consistency
+
+`CustomThreadPoolConcurrentSubmissionTest` verifies that under concurrent task submission:
+
+- `submittedTaskCount = acceptedTaskCount + rejectedTaskCount`
+- after graceful shutdown, `completedTaskCount = acceptedTaskCount`
+- externally observed rejections match internal pool metrics
+- executed task count matches completed task count
+
+This test is useful for detecting race conditions and inconsistencies in counters and submission handling.
+
+---
+
+### Why these tests are important
+
+This project is highly concurrent, which means that some errors cannot be found by simple functional checks alone.
+
+Several tests were intentionally written around:
+
+- queue pressure
+- worker growth and shrink
+- graceful shutdown
+- immediate shutdown
+- metric consistency
+- concurrent task submission
+
+This helped reveal and fix subtle multithreading issues, including race conditions in idle-timeout worker termination logic.
+
+### Scope of testing
+
+The goal of the test suite is not to prove that the implementation is perfect in all possible concurrency situations.
+
+Instead, the goal is to provide strong coverage for:
+
+- public API behavior
+- configuration validation
+- task acceptance and rejection
+- worker lifecycle
+- shutdown semantics
+- runtime metrics
+- important concurrency edge cases
+
+For an educational custom thread pool project, this level of testing provides solid confidence in the correctness of the core behavior.
 
 
 ## Performance Notes
