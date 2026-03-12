@@ -6,7 +6,7 @@ This project implements a custom thread pool in Java without using `ThreadPoolEx
 
 The goal of the project is to simulate the behavior of a configurable server-side task execution system that can process tasks concurrently, distribute them between worker threads, handle overload situations, and support both graceful and immediate shutdown.
 
-The implementation was designed as an educational project, but it also demonstrates several important concurrency and system design concepts:
+The implementation was developed as part of a course project and demonstrates several important concurrency and system design concepts:
 
 - custom worker management
 - bounded task queues
@@ -46,7 +46,8 @@ This project covers the main requirements of the task:
 - graceful shutdown and immediate shutdown
 - support for both `execute()` and `submit()`
 - detailed logging of important lifecycle events
-- demonstration program instead of unit tests
+- demonstration program instead of unit tests 
+- built-in runtime metrics used for performance analysis, configuration comparison, and observation of queue pressure, worker growth, task completion, and rejection rate
 
 ---
 
@@ -100,7 +101,7 @@ This allows the pool to reuse the same internal task execution pipeline that is 
 
 ### 7. Console logging is used instead of a full logging framework
 
-For simplicity and educational clarity, the project uses `System.out.println(...)` for logging.
+For simplicity and educational clarity, the project uses `System.out.println(...)` for logging (the same as in the task statement).
 
 This is enough to observe the lifecycle of the pool and task execution flow, even though a production-ready system would normally use a real logging framework.
 
@@ -134,6 +135,9 @@ If no task arrives within the timeout period, the worker may terminate, but only
 
 This allows the pool to grow under load and shrink back when the extra workers are no longer needed.
 
+The architecture was also designed with testability in mind.  
+Key responsibilities were separated into small components such as configuration, balancing, rejection policy, worker control, and pool coordination, which made it possible to cover both deterministic logic and multithreaded behavior with unit and concurrency-oriented tests.
+
 ### Code structure
     src
     ├── main
@@ -158,7 +162,6 @@ This allows the pool to grow under load and shrink back when the extra workers a
     │            │   │   └── CustomThreadFactory.java
     │            │   ├── metrics
     │            │   │   └── PoolMetricsSnapshot.java
-    │            │   ├── queue
     │            │   ├── rejection
     │            │   │   └── RejectionPolicy.java
     │            │   └── worker
@@ -192,6 +195,25 @@ This allows the pool to grow under load and shrink back when the extra workers a
                     └── rejection
                         └── RejectPolicyTest.java
 
+- `CustomExecutor` — public interface of the custom thread pool API.
+- `PoolConfig` — stores and validates all pool configuration parameters.
+- `CustomThreadPool` — the main coordination class that manages workers, task submission, shutdown, and metrics.
+- `Worker` — processes tasks from its personal queue and handles idle-timeout termination.
+- `WorkerController` — internal contract used by workers to query pool state and report termination.
+- `CustomThreadFactory` — creates named worker threads and logs their creation.
+- `TaskBalancer` — abstraction for task distribution across worker queues.
+- `RoundRobinBalancer` — default balancing strategy that distributes tasks in circular order.
+- `RejectionPolicy` — abstraction for overload handling.
+- `RejectPolicy` — rejection strategy that throws `RejectedExecutionException` when a task cannot be accepted.
+- `PoolMetricsSnapshot` — immutable snapshot of runtime pool metrics.
+- `DemoTask` — simple `Runnable` task used for demonstration scenarios.
+- `DemoCallableTask` — simple `Callable` task used to demonstrate `submit()` and `Future`.
+- `Main` — runs demonstration scenarios for normal execution, shutdown, and configuration comparison.
+
+Test files will be discussed in the Test Coverage overview. 
+
+---
+
 ## Main Components
 
 ### `CustomExecutor`
@@ -205,8 +227,6 @@ It defines the following methods:
 - `shutdownNow()`
 
 This interface makes the pool easy to use from application code and keeps the public contract clear.
-
----
 
 ### `PoolConfig`
 
@@ -231,8 +251,6 @@ The class also validates input values to prevent invalid pool configuration, suc
 
 This makes pool initialization safer and easier to understand.
 
----
-
 ### `CustomThreadPool`
 
 `CustomThreadPool` is the central coordination class of the project.
@@ -254,8 +272,6 @@ This class implements both:
 
 This design keeps worker logic simpler while still allowing workers to query pool state.
 
----
-
 ### `Worker`
 
 A `Worker` is a task-processing component that implements `Runnable`.
@@ -272,8 +288,6 @@ Each worker:
 A worker is not the same as a Java `Thread`.  
 It only contains execution logic. The actual thread object is created separately by `CustomThreadFactory`.
 
----
-
 ### `WorkerController`
 
 `WorkerController` is a small internal interface used by `Worker`.
@@ -287,8 +301,6 @@ It allows a worker to:
 
 This avoids hard-coding the worker to the full implementation of the pool and improves separation of responsibilities.
 
----
-
 ### `CustomThreadFactory`
 
 `CustomThreadFactory` creates worker threads with readable and unique names.
@@ -300,8 +312,6 @@ Example thread names:
 
 This class also logs thread creation events, which makes debugging and demonstration easier.
 
----
-
 ### `TaskBalancer`
 
 `TaskBalancer` is an abstraction for queue selection.
@@ -309,8 +319,6 @@ This class also logs thread creation events, which makes debugging and demonstra
 Instead of hardcoding the distribution logic directly inside the pool, the pool asks the balancer which queue index should be used as a starting point.
 
 This makes the architecture more flexible and allows replacing the strategy later if needed.
-
----
 
 ### `RoundRobinBalancer`
 
@@ -326,8 +334,6 @@ It distributes tasks in circular order:
 
 The implementation uses `AtomicInteger` to ensure thread-safe index updates.
 
----
-
 ### `RejectionPolicy`
 
 `RejectionPolicy` defines what happens when the pool cannot accept a new task.
@@ -340,8 +346,6 @@ This is necessary when:
 
 Separating this logic into its own interface makes the overload handling strategy replaceable.
 
----
-
 ### `RejectPolicy`
 
 `RejectPolicy` is the default overload handling strategy used in this project.
@@ -351,7 +355,7 @@ When a task cannot be accepted, this policy:
 1. logs the rejection
 2. throws `RejectedExecutionException`
 
-This approach is simple, explicit, and easy to demonstrate.
+This approach is straightforward, explicit, and easy to demonstrate.
 
 ---
 
@@ -377,7 +381,7 @@ Round Robin was chosen because it is:
 - simple to implement
 - easy to explain
 - predictable in behavior
-- fully sufficient for an educational project
+- fully sufficient for this course work 
 
 It also matches the task statement, where Round Robin is explicitly suggested as one possible balancing algorithm.
 
@@ -395,14 +399,14 @@ This improves practical behavior:
 
 ### Possible future alternatives
 
-Because the balancing strategy is isolated behind the `TaskBalancer` interface, the project could later be extended with strategies such as:
+Because the balancing strategy is isolated behind the `TaskBalancer` interface, we can choose another strategy such as:
 
 - Least Loaded
 - Shortest Queue First
 - Random
 - Power of Two Choices
 
-These strategies were not implemented in the current version in order to keep the solution simpler and clearer.
+These strategies were not implemented in the current version.
 
 ---
 
@@ -443,7 +447,7 @@ It also clearly shows overload situations during testing and makes failures visi
 - simple and explicit behavior
 - no hidden fallback logic
 - easy to debug
-- easy to explain in a report or presentation
+- easy to explain in this course work (task) 
 
 ### Disadvantages
 
@@ -455,7 +459,7 @@ It also clearly shows overload situations during testing and makes failures visi
 
 A possible alternative would be `CallerRunsPolicy`, where the rejected task is executed in the calling thread.
 
-This would reduce task loss and create natural backpressure, but it would also make the behavior less predictable and slightly more difficult to explain for this educational version.
+This would reduce task loss and create natural backpressure, but it would also make the behavior less predictable and slightly more difficult to explain for this course work.
 
 ---
 
@@ -478,8 +482,6 @@ Each worker receives:
 - `keepAliveTime`
 - `timeUnit`
 
----
-
 ### 2. Waiting for tasks
 
 A worker waits for tasks using:
@@ -491,8 +493,6 @@ This is an important design choice.
 The worker does not use `take()`, because `take()` would block forever and would not allow the worker to detect idle timeout.
 
 Using `poll(...)` allows the worker to wake up periodically and decide whether it should stop.
-
----
 
 ### 3. Task execution
 
@@ -508,8 +508,6 @@ If a task throws `RuntimeException`, the worker catches it, logs the failure, an
 
 This is important because one broken task must not kill the whole worker.
 
----
-
 ### 4. Idle timeout
 
 If the worker does not receive a task during the configured timeout period, it asks the pool whether it is allowed to stop.
@@ -522,8 +520,6 @@ This means:
 - extra workers may disappear when load becomes lower
 
 This behavior allows the pool to scale up and later shrink back.
-
----
 
 ### 5. Graceful shutdown behavior
 
@@ -539,8 +535,6 @@ A worker finishes only when:
 
 This ensures that accepted tasks are not lost during normal shutdown.
 
----
-
 ### 6. Immediate shutdown behavior
 
 During `shutdownNow()`:
@@ -555,8 +549,6 @@ Whether the task stops immediately depends on whether that task reacts correctly
 
 This behavior is consistent with normal Java threading semantics.
 
----
-
 ### 7. Termination
 
 When a worker finishes, it:
@@ -566,6 +558,8 @@ When a worker finishes, it:
 - logs the termination event
 
 The pool then removes the worker from its internal collections.
+
+---
 
 ## Shutdown Behavior
 
@@ -632,7 +626,7 @@ The only mechanism used for running tasks is thread interruption.
 
 The project includes detailed console logging for all major lifecycle events.
 
-For simplicity, logging is implemented using `System.out.println(...)`.
+In this course work for simplicity, logging is implemented using `System.out.println(...)`.
 
 A production-ready system would normally use a real logging framework such as:
 
@@ -641,7 +635,7 @@ A production-ready system would normally use a real logging framework such as:
 - Log4j
 - `java.util.logging`
 
-However, for an educational project, console logging is sufficient and makes behavior easy to observe.
+However, for this course work, console logging is sufficient and makes behavior easy to observe.
 
 ### Logged events
 
@@ -734,6 +728,7 @@ This summary includes:
 
 This makes the demo not only illustrative, but also measurable.
 
+---
 
 ## Demo Scenarios
 
@@ -762,8 +757,6 @@ In the measured run:
 
 This scenario shows that the default configuration can absorb this workload without task loss.
 
----
-
 ### Demo 2: `submit()` + `Future`
 
 This scenario demonstrates:
@@ -782,8 +775,6 @@ In the measured run:
 - rejection rate was 0%
 
 This scenario confirms that the pool correctly supports tasks with results.
-
----
 
 ### Demo 3: `shutdownNow()`
 
@@ -804,8 +795,6 @@ In the measured run:
 - rejection rate was 0%
 
 This scenario clearly shows the difference between **accepted** work and **completed** work during immediate shutdown.
-
----
 
 ### Demo 4: configuration comparison
 
@@ -864,11 +853,15 @@ Measured result:
 
 This configuration comparison demonstrates how pool sizing and queue capacity directly affect acceptance rate, rejection rate, queue pressure, and throughput.
 
+---
+
 ## Test Coverage Overview
 
 The project includes a set of unit and concurrency-oriented tests that validate the main parts of the custom thread pool implementation.
 
 The test suite was designed step by step, starting from simple deterministic components and then moving to more complex multithreaded scenarios.
+
+The tests were used not only to validate the implementation but also to improve it. In particular, one of the concurrency-oriented tests revealed a race condition in the idle-timeout logic, where multiple workers could stop at the same time and shrink the pool below `corePoolSize`. After identifying this issue through testing, the implementation was corrected and the fix was verified by rerunning the test suite.
 
 ### What is covered by tests
 
@@ -889,8 +882,6 @@ This includes checks for:
 - invalid `queueSize`
 - invalid `minSpareThreads`
 
----
-
 #### 2. Balancer behavior
 
 `RoundRobinBalancerTest` verifies that:
@@ -901,8 +892,6 @@ This includes checks for:
 
 This confirms the correctness of the default balancing strategy.
 
----
-
 #### 3. Rejection policy
 
 `RejectPolicyTest` verifies that:
@@ -910,8 +899,6 @@ This confirms the correctness of the default balancing strategy.
 - rejected tasks cause `RejectedExecutionException`
 
 This confirms that overload handling works according to the selected rejection strategy.
-
----
 
 #### 4. Thread factory behavior
 
@@ -923,8 +910,6 @@ This confirms that overload handling works according to the selected rejection s
 
 This ensures readable and deterministic worker thread naming.
 
----
-
 #### 5. Task submission with results
 
 `CustomThreadPoolSubmitTest` verifies that:
@@ -935,8 +920,6 @@ This ensures readable and deterministic worker thread naming.
 
 This confirms correct support for `Callable` tasks and `Future`-based result handling.
 
----
-
 #### 6. Runnable execution
 
 `CustomThreadPoolExecuteTest` verifies that:
@@ -945,8 +928,6 @@ This confirms correct support for `Callable` tasks and `Future`-based result han
 - multiple `Runnable` tasks can be completed successfully
 
 This confirms the basic execution behavior of the pool.
-
----
 
 #### 7. Shutdown contract
 
@@ -959,8 +940,6 @@ This confirms the basic execution behavior of the pool.
 
 This confirms that shutdown state prevents acceptance of new work.
 
----
-
 #### 8. Graceful shutdown semantics
 
 `CustomThreadPoolGracefulShutdownTest` verifies that:
@@ -971,8 +950,6 @@ This confirms that shutdown state prevents acceptance of new work.
 
 This confirms the intended semantics of graceful shutdown.
 
----
-
 #### 9. Runtime metrics
 
 `CustomThreadPoolMetricsTest` verifies that:
@@ -981,8 +958,6 @@ This confirms the intended semantics of graceful shutdown.
 - rejected submissions update submitted / rejected counters correctly
 
 This confirms that internal pool metrics remain consistent in simple scenarios.
-
----
 
 #### 10. Immediate shutdown metrics behavior
 
@@ -993,8 +968,6 @@ This confirms that internal pool metrics remain consistent in simple scenarios.
 - pending queue count becomes zero after immediate shutdown
 
 This confirms the difference between accepted work and completed work during forced shutdown.
-
----
 
 #### 11. Pool growth behavior
 
@@ -1009,8 +982,6 @@ This confirms the difference between accepted work and completed work during for
 
 Together, these tests confirm correct worker growth behavior and correct upper-capacity limits.
 
----
-
 #### 12. Idle timeout behavior
 
 `CustomThreadPoolIdleTimeoutTest` verifies that:
@@ -1024,8 +995,6 @@ Together, these tests confirm correct worker growth behavior and correct upper-c
 
 These tests are especially important because they validate one of the most concurrency-sensitive parts of the implementation.
 
----
-
 #### 13. Reuse after shrink-back
 
 `CustomThreadPoolReuseAfterShrinkTest` verifies that:
@@ -1036,8 +1005,6 @@ These tests are especially important because they validate one of the most concu
 
 This confirms that worker lifecycle transitions do not break later task execution.
 
----
-
 #### 14. Queue clearing behavior during `shutdownNow()`
 
 `CustomThreadPoolShutdownNowQueueClearBehaviorTest` verifies that:
@@ -1045,8 +1012,6 @@ This confirms that worker lifecycle transitions do not break later task executio
 - a queued task is not executed if `shutdownNow()` clears the queue before that task starts
 
 This is a behavioral confirmation of the immediate-shutdown semantics.
-
----
 
 #### 15. Concurrent submission consistency
 
@@ -1058,8 +1023,6 @@ This is a behavioral confirmation of the immediate-shutdown semantics.
 - executed task count matches completed task count
 
 This test is useful for detecting race conditions and inconsistencies in counters and submission handling.
-
----
 
 ### Why these tests are important
 
@@ -1092,10 +1055,11 @@ Instead, the goal is to provide strong coverage for:
 
 For an educational custom thread pool project, this level of testing provides solid confidence in the correctness of the core behavior.
 
+---
 
 ## Performance Notes
 
-This project was implemented primarily as an educational custom thread pool, not as a production-ready high-performance replacement for `ThreadPoolExecutor`.
+This project was implemented primarily as an educational custom thread pool (as course work statement defines), not as a production-ready high-performance replacement for `ThreadPoolExecutor`.
 
 At the same time, the current version already includes **built-in runtime metrics**, which makes it possible to observe real pool behavior during demo execution instead of relying only on theoretical assumptions.
 
@@ -1170,8 +1134,6 @@ The main factors affecting performance are:
 For stable, constantly loaded systems, a larger `corePoolSize` may reduce latency.  
 For bursty workloads, a moderate value is usually more reasonable.
 
----
-
 #### `maxPoolSize`
 
 `maxPoolSize` defines how much the pool may grow under pressure.
@@ -1180,8 +1142,6 @@ For bursty workloads, a moderate value is usually more reasonable.
 - if `maxPoolSize` is too large, the system may create too many threads and waste CPU time on scheduling and context switching
 
 A higher `maxPoolSize` may improve throughput for blocking or waiting tasks, but too many threads can reduce efficiency.
-
----
 
 #### `queueSize`
 
@@ -1193,8 +1153,6 @@ In this project, `queueSize` is the capacity of one worker queue.
 If queues are too large, tasks may spend more time waiting before execution.  
 If queues are too small, the pool may reject tasks too aggressively.
 
----
-
 #### `minSpareThreads`
 
 `minSpareThreads` controls how many idle workers the pool tries to keep available.
@@ -1204,8 +1162,6 @@ If queues are too small, the pool may reject tasks too aggressively.
 
 If this value is too high, the pool may create workers earlier than necessary.  
 If it is too low, sudden spikes may experience additional latency.
-
----
 
 #### `keepAliveTime`
 
@@ -1282,8 +1238,6 @@ For an educational report, it is acceptable to describe these expected trade-off
 
 ### Observations from measured results
 
-### Observations from measured results
-
 #### Observations from the main demo scenarios
 
 - In Demo 1, the default configuration successfully handled all 12 submitted tasks without rejections and scaled up to 4 workers.
@@ -1339,8 +1293,6 @@ At the moment, the demo uses `Thread.sleep(...)` to wait for shutdown progress.
 
 A more complete implementation could add an `awaitTermination()` method similar to standard Java executors.
 
----
-
 ### 2. Add more rejection policies
 
 Currently the pool uses only `RejectPolicy`.
@@ -1351,8 +1303,6 @@ Possible alternatives:
 - `DiscardPolicy`
 - `DiscardOldestPolicy`
 - custom backpressure strategies
-
----
 
 ### 3. Add more balancing strategies
 
@@ -1365,8 +1315,6 @@ Possible future strategies:
 - Random
 - Power of Two Choices
 
----
-
 ### 4. Introduce a dedicated queue abstraction
 
 At the moment, worker queues are represented directly by `ArrayBlockingQueue<Runnable>` inside `Worker`.
@@ -1377,8 +1325,6 @@ A future version could introduce a separate queue wrapper that would provide:
 - queue-level logging
 - queue statistics
 - explicit queue state management
-
----
 
 ### 5. Replace console logging with a real logging framework
 
@@ -1395,8 +1341,6 @@ This would allow:
 - file logging
 - structured output
 
----
-
 ### 6. Improve synchronization and scalability
 
 The current version uses relatively simple synchronization and collections in order to remain understandable.
@@ -1407,20 +1351,29 @@ A more advanced implementation could improve throughput and reduce contention by
 - reducing synchronized sections
 - using more specialized concurrent data structures
 
----
+### 7. Extend metrics and monitoring
 
-### 7. Add metrics and monitoring
+The current implementation already provides built-in runtime metrics, including:
 
-A production-ready version could expose:
-
-- active worker count
-- queue sizes
-- rejection count
+- submitted task count
+- accepted task count
+- rejected task count
 - completed task count
-- average task wait time
-- average execution time
+- current worker count
+- busy and idle worker count
+- peak worker count
+- current and peak pending task count
 
----
+A more advanced version could extend this monitoring support with additional capabilities such as:
+
+- average task wait time in queue
+- average task execution time
+- separate counters for interrupted tasks
+- per-worker queue statistics
+- metrics history over time
+- periodic metrics snapshots
+- export of metrics for external monitoring tools
+
 
 ### 8. Extend API compatibility
 
@@ -1462,7 +1415,7 @@ The implementation supports:
 - detailed lifecycle logging
 - built-in runtime metrics
 
-Although the implementation is simpler than standard library executors or production-grade server pools, it successfully demonstrates the main mechanisms required by the task.
+Although the implementation is simpler than standard library executors or production-grade server pools, it successfully demonstrates the main mechanisms required by the task (course work).
 
 The most important result of the project is not maximum performance, but a clear understanding of:
 

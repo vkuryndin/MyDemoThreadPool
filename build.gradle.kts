@@ -1,3 +1,11 @@
+import org.gradle.api.tasks.SourceSetContainer
+import org.gradle.api.tasks.javadoc.Javadoc
+import org.gradle.external.javadoc.StandardJavadocDocletOptions
+import org.gradle.jvm.tasks.Jar
+import org.gradle.kotlin.dsl.named
+import org.gradle.kotlin.dsl.register
+import org.gradle.kotlin.dsl.the
+
 plugins {
     id("java")
     jacoco
@@ -47,4 +55,52 @@ tasks.jacocoTestCoverageVerification {
 
 tasks.check {
     dependsOn(tasks.jacocoTestCoverageVerification)
+}
+//Javadocs
+
+java {
+    withJavadocJar()
+}
+
+val sourceSets = the<SourceSetContainer>()
+
+tasks.named<Javadoc>("javadoc") {
+    description = "Generates Javadoc HTML for main sources."
+    group = "documentation"
+
+    source = sourceSets["main"].allJava
+    classpath = sourceSets["main"].compileClasspath + sourceSets["main"].output
+
+    options.encoding = "UTF-8"
+
+    (options as StandardJavadocDocletOptions).apply {
+        author(true)
+        version(true)
+        links("https://docs.oracle.com/en/java/javase/17/docs/api/")
+    }
+}
+
+val testJavadoc by tasks.registering(Javadoc::class) {
+    description = "Generates Javadoc HTML for test sources."
+    group = "documentation"
+
+    source = sourceSets["test"].allJava
+    classpath = sourceSets["test"].compileClasspath + sourceSets["test"].output
+    destinationDir = layout.buildDirectory.dir("docs/javadoc-test").get().asFile
+
+    options.encoding = "UTF-8"
+
+
+    (options as StandardJavadocDocletOptions).apply {
+        memberLevel = JavadocMemberLevel.PRIVATE
+        author(true)
+        version(true)
+        links("https://docs.oracle.com/en/java/javase/17/docs/api/")
+    }
+}
+
+val testJavadocJar by tasks.registering(Jar::class) {
+    dependsOn(testJavadoc)
+    archiveClassifier.set("test-javadoc")
+    from(layout.buildDirectory.dir("docs/javadoc-test"))
 }
