@@ -16,6 +16,8 @@ The implementation was developed as part of a course project and demonstrates se
 - graceful and immediate shutdown
 - support for both `Runnable` and `Callable` tasks
 - detailed console logging
+- built-in runtime metrics for performance observation
+- unit and concurrency-oriented testing of deterministic and multithreaded behavior
 
 The pool implements the following custom interface:
 
@@ -46,7 +48,8 @@ This project covers the main requirements of the task:
 - graceful shutdown and immediate shutdown
 - support for both `execute()` and `submit()`
 - detailed logging of important lifecycle events
-- demonstration program instead of unit tests 
+- demonstration program for behavioral validation
+- unit and concurrency-oriented tests for deterministic and multithreaded scenarios
 - built-in runtime metrics used for performance analysis, configuration comparison, and observation of queue pressure, worker growth, task completion, and rejection rate
 
 ---
@@ -163,10 +166,11 @@ Key responsibilities were separated into small components such as configuration,
     │            │   ├── metrics
     │            │   │   └── PoolMetricsSnapshot.java
     │            │   ├── rejection
+    │            │       └── RejectPolicy.java
     │            │   │   └── RejectionPolicy.java
     │            │   └── worker
+    │            │       └── Worker.java
     │            │       └── WorkerController.java
-    │            └── Main.java
     └── test
         └── java
            └── org
@@ -1433,4 +1437,4 @@ The measured demo scenarios also show that configuration has a direct and visibl
 - worker scaling
 - queue pressure
 
-As an educational implementation, this project fulfills the assignment goals and provides a good foundation for further experiments with concurrency, configuration tuning, and custom executor design.
+As a course project implementation, this work fulfills the assignment goals and provides a good foundation for further experiments with concurrency, configuration tuning, and custom executor design.
