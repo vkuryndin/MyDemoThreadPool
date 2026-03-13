@@ -29,7 +29,7 @@ class CustomThreadPoolCoreWorkerIdleTimeoutTest {
     CustomThreadPool pool = createSingleCoreWorkerPool("CoreIdleTimeoutPool");
 
     try {
-      /**
+      /*
        * Wait noticeably longer than keepAliveTime.
        *
        * <p>keepAliveTime in this test pool is 300 ms, so 1000 ms gives enough time for an incorrect

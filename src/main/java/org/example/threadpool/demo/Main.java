@@ -61,7 +61,7 @@ public class Main {
     CustomThreadPool pool = createDemoPool("ExecuteDemoPool");
     long startNanos = System.nanoTime();
 
-    /**
+    /*
      * Submit many long-running tasks quickly.
      *
      * <p>This should demonstrate: - normal execution - queue filling - possible pool growth -
@@ -77,10 +77,10 @@ public class Main {
       }
     }
 
-    /** Wait a little so that tasks can start. */
+    /* Wait a little so that tasks can start. */
     Thread.sleep(7000);
 
-    /**
+    /*
      * Request graceful shutdown.
      *
      * <p>Already accepted tasks may continue to run.
@@ -88,7 +88,7 @@ public class Main {
     System.out.println("[Main] Calling shutdown()");
     pool.shutdown();
 
-    /** Wait so that accepted tasks can finish. */
+    /* Wait so that accepted tasks can finish. */
     Thread.sleep(10000);
 
     long endNanos = System.nanoTime();
@@ -108,12 +108,12 @@ public class Main {
     CustomThreadPool pool = createDemoPool("SubmitDemoPool");
     long startNanos = System.nanoTime();
 
-    /** Submit several Callable tasks and store the returned futures. */
+    /* Submit several Callable tasks and store the returned futures. */
     Future<String> future1 = pool.submit(new DemoCallableTask("Callable-1", 2000));
     Future<String> future2 = pool.submit(new DemoCallableTask("Callable-2", 3000));
     Future<String> future3 = pool.submit(new DemoCallableTask("Callable-3", 1000));
 
-    /**
+    /*
      * Read results from Future objects.
      *
      * <p>Future.get() blocks until the corresponding task is completed.
@@ -122,7 +122,7 @@ public class Main {
     printFutureResult("future2", future2);
     printFutureResult("future3", future3);
 
-    /** Shut down the pool after all results are collected. */
+    /* Shut down the pool after all results are collected. */
     System.out.println("[Main] Calling shutdown()");
     pool.shutdown();
 
@@ -146,7 +146,7 @@ public class Main {
     CustomThreadPool pool = createDemoPool("ShutdownNowDemoPool");
     long startNanos = System.nanoTime();
 
-    /**
+    /*
      * Submit several long-running tasks.
      *
      * <p>Some tasks will start running, others may wait in queues.
@@ -161,10 +161,10 @@ public class Main {
       }
     }
 
-    /** Give workers time to start processing some tasks. */
+    /* Give workers time to start processing some tasks. */
     Thread.sleep(2000);
 
-    /**
+    /*
      * Request immediate shutdown.
      *
      * <p>Waiting tasks should be removed from queues, and worker threads should be interrupted.
@@ -172,7 +172,7 @@ public class Main {
     System.out.println("[Main] Calling shutdownNow()");
     pool.shutdownNow();
 
-    /** Wait to observe interruption logs. */
+    /* Wait to observe interruption logs. */
     Thread.sleep(5000);
 
     long endNanos = System.nanoTime();
@@ -192,7 +192,7 @@ public class Main {
     System.out.println("DEMO 4: configuration comparison");
     System.out.println(SECTION_LINE);
 
-    /**
+    /*
      * The same workload will be submitted to all configurations.
      *
      * <p>We intentionally use many tasks submitted quickly so that differences in queue capacity
@@ -202,7 +202,7 @@ public class Main {
     long taskDurationMillis = 2000;
     long waitAfterShutdownMillis = 10000;
 
-    /**
+    /*
      * Small configuration: - low core size - low max size - small queue
      *
      * <p>Expected behavior: more rejection and lower peak capacity.
@@ -214,7 +214,7 @@ public class Main {
         taskDurationMillis,
         waitAfterShutdownMillis);
 
-    /** Medium configuration: balanced settings close to the main demo pool. */
+    /* Medium configuration: balanced settings close to the main demo pool. */
     runSingleConfigurationCase(
         "Config B (medium)",
         new PoolConfig(2, 4, 5, TimeUnit.SECONDS, 2, 1),
@@ -222,7 +222,7 @@ public class Main {
         taskDurationMillis,
         waitAfterShutdownMillis);
 
-    /**
+    /*
      * Larger configuration: more workers and larger queues.
      *
      * <p>Expected behavior: fewer rejections and higher acceptance capacity.
@@ -339,7 +339,7 @@ public class Main {
 
     long startNanos = System.nanoTime();
 
-    /** Submit the same workload for every configuration. */
+    /* Submit the same workload for every configuration. */
     for (int i = 1; i <= taskCount; i++) {
       DemoTask task = new DemoTask(caseName + "-Task-" + i, taskDurationMillis);
 
@@ -350,10 +350,10 @@ public class Main {
       }
     }
 
-    /** Graceful shutdown is used so that all accepted tasks have a chance to complete. */
+    /* Graceful shutdown is used so that all accepted tasks have a chance to complete. */
     pool.shutdown();
 
-    /** Wait long enough for accepted tasks to finish. */
+    /* Wait long enough for accepted tasks to finish. */
     Thread.sleep(waitAfterShutdownMillis);
 
     long endNanos = System.nanoTime();

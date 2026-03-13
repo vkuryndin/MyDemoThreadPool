@@ -160,12 +160,12 @@ public final class Worker implements Runnable {
   public void run() {
     try {
       while (true) {
-        /** If immediate shutdown was requested, stop as soon as possible. */
+        /* If immediate shutdown was requested, stop as soon as possible. */
         if (controller.isShutdownNow()) {
           break;
         }
 
-        /**
+        /*
          * In graceful shutdown mode, the worker should finish only after its queue becomes empty.
          */
         if (controller.isShutdown() && taskQueue.isEmpty()) {
@@ -174,7 +174,7 @@ public final class Worker implements Runnable {
 
         Runnable task = taskQueue.poll(keepAliveTime, timeUnit);
 
-        /**
+        /*
          * If no task was received during the idle timeout, ask the pool whether this worker may
          * stop.
          *
@@ -194,7 +194,7 @@ public final class Worker implements Runnable {
           continue;
         }
 
-        /** If immediate shutdown started after we received the task, do not execute it. */
+        /* If immediate shutdown started after we received the task, do not execute it. */
         if (controller.isShutdownNow()) {
           break;
         }
@@ -202,7 +202,7 @@ public final class Worker implements Runnable {
         executeTask(task);
       }
     } catch (InterruptedException e) {
-      /** The worker may be interrupted during shutdownNow() while waiting on the queue. */
+      /* The worker may be interrupted during shutdownNow() while waiting on the queue. */
       Thread.currentThread().interrupt();
     } finally {
       synchronized (queueLock) {

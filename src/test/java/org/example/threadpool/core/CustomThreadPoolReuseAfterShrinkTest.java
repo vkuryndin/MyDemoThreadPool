@@ -58,7 +58,7 @@ class CustomThreadPoolReuseAfterShrinkTest {
             initialWorkCompleted.countDown();
           };
 
-      /** Force the pool to grow from 1 worker to 2 workers. */
+      /* Force the pool to grow from 1 worker to 2 workers. */
       pool.execute(firstTask);
 
       boolean firstStarted = firstTaskStarted.await(3, TimeUnit.SECONDS);
@@ -73,17 +73,17 @@ class CustomThreadPoolReuseAfterShrinkTest {
       PoolMetricsSnapshot grownSnapshot = pool.getMetricsSnapshot();
       assertEquals(2, grownSnapshot.getPeakWorkerCount());
 
-      /** Finish the initial workload. */
+      /* Finish the initial workload. */
       releaseFirstTask.countDown();
 
       boolean initialCompleted = initialWorkCompleted.await(5, TimeUnit.SECONDS);
       assertTrue(initialCompleted, "The initial workload did not complete within the timeout");
 
-      /** Wait until the extra worker disappears and the pool shrinks back. */
+      /* Wait until the extra worker disappears and the pool shrinks back. */
       boolean shrunk = waitUntilWorkerCountBecomes(pool, 1, 5, TimeUnit.SECONDS);
       assertTrue(shrunk, "The pool did not shrink back to corePoolSize within the timeout");
 
-      /** Now submit a brand new task after shrink-back. The pool must still be usable. */
+      /* Now submit a brand new task after shrink-back. The pool must still be usable. */
       CountDownLatch newTaskCompleted = new CountDownLatch(1);
       AtomicInteger counter = new AtomicInteger(0);
 

@@ -59,22 +59,22 @@ class CustomThreadPoolGracefulShutdownTest {
             allAcceptedTasksCompleted.countDown();
           };
 
-      /** Submit the first task and wait until it really starts running. */
+      /* Submit the first task and wait until it really starts running. */
       pool.execute(firstTask);
 
       boolean firstTaskReallyStarted = firstTaskStarted.await(3, TimeUnit.SECONDS);
       assertTrue(firstTaskReallyStarted, "The first task did not start within the timeout");
 
-      /**
+      /*
        * Submit the second task. Because the pool has only one worker, this task should be accepted
        * into the queue and wait there.
        */
       pool.execute(secondTask);
 
-      /** Start graceful shutdown. Already accepted tasks must still be allowed to finish. */
+      /* Start graceful shutdown. Already accepted tasks must still be allowed to finish. */
       pool.shutdown();
 
-      /** Any new task after shutdown() must be rejected. */
+      /* Any new task after shutdown() must be rejected. */
       assertThrows(
           RejectedExecutionException.class,
           () ->
@@ -83,7 +83,7 @@ class CustomThreadPoolGracefulShutdownTest {
                     // This task must not be accepted after shutdown().
                   }));
 
-      /**
+      /*
        * Allow the first running task to finish. After that, the queued second task should also
        * execute.
        */
@@ -94,7 +94,7 @@ class CustomThreadPoolGracefulShutdownTest {
       assertTrue(allCompleted, "Accepted tasks did not complete within the timeout");
       assertEquals(2, completedTaskCounter.get());
     } finally {
-      /** Ensure the pool is fully stopped even if the test fails. */
+      /* Ensure the pool is fully stopped even if the test fails. */
       allowFirstTaskToFinish.countDown();
       pool.shutdownNow();
     }

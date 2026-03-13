@@ -60,16 +60,16 @@ class CustomThreadPoolShutdownNowQueueClearBehaviorTest {
             executedTaskCounter.incrementAndGet();
           };
 
-      /** Start the first task and wait until it is definitely running. */
+      /* Start the first task and wait until it is definitely running. */
       pool.execute(firstTask);
 
       boolean started = firstTaskStarted.await(3, TimeUnit.SECONDS);
       assertTrue(started, "The first task did not start within the timeout");
 
-      /** Submit the second task. With one worker, it should stay in the queue. */
+      /* Submit the second task. With one worker, it should stay in the queue. */
       pool.execute(secondTask);
 
-      /**
+      /*
        * Immediate shutdown should interrupt the running task and clear the queued task before it
        * starts.
        */
@@ -78,18 +78,18 @@ class CustomThreadPoolShutdownNowQueueClearBehaviorTest {
       boolean finished = firstTaskFinished.await(3, TimeUnit.SECONDS);
       assertTrue(finished, "The interrupted first task did not finish within the timeout");
 
-      /**
+      /*
        * Give the pool a short extra moment to expose a possible bug where the queued second task
        * could still run incorrectly.
        */
       Thread.sleep(300);
 
-      /** Only the first task should have executed. The queued second task must never run. */
+      /* Only the first task should have executed. The queued second task must never run. */
       assertEquals(1, executedTaskCounter.get());
       assertFalse(
           secondTaskExecuted.get(), "The queued task should not execute after shutdownNow()");
 
-      /** Optional additional validation through metrics. */
+      /* Optional additional validation through metrics. */
       PoolMetricsSnapshot metrics = pool.getMetricsSnapshot();
 
       assertEquals(2, metrics.getSubmittedTaskCount());
@@ -98,7 +98,7 @@ class CustomThreadPoolShutdownNowQueueClearBehaviorTest {
       assertEquals(1, metrics.getCompletedTaskCount());
       assertEquals(0, metrics.getCurrentPendingTaskCount());
     } finally {
-      /**
+      /*
        * Release the latch just in case the first task was not interrupted because of an earlier
        * unexpected failure in the test.
        */

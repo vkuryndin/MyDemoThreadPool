@@ -489,13 +489,13 @@ public final class CustomThreadPool implements CustomExecutor, WorkerController 
     Runnable trackedCommand = wrapWithMetrics(command);
 
     synchronized (stateLock) {
-      /** The pool must not accept new tasks after shutdown starts. */
+      /* The pool must not accept new tasks after shutdown starts. */
       if (shutdownRequested || shutdownNowRequested) {
         rejectTask(trackedCommand);
         return;
       }
 
-      /** Try to maintain the configured number of spare idle workers. */
+      /* Try to maintain the configured number of spare idle workers. */
       ensureMinSpareWorkers();
 
       /** First try to place the task into one of the existing worker queues. */
@@ -503,7 +503,7 @@ public final class CustomThreadPool implements CustomExecutor, WorkerController 
         return;
       }
 
-      /** If all existing queues are full, try to grow the pool. */
+      /* If all existing queues are full, try to grow the pool. */
       if (canCreateMoreWorkers()) {
         Worker newWorker = createAndStartWorker();
 
@@ -516,7 +516,7 @@ public final class CustomThreadPool implements CustomExecutor, WorkerController 
         }
       }
 
-      /** If nothing helped, apply the overload policy. */
+      /* If nothing helped, apply the overload policy. */
       rejectTask(trackedCommand);
     }
   }

@@ -57,7 +57,7 @@ class CustomThreadPoolConcurrentSubmissionTest {
                               actuallyExecutedTasks.incrementAndGet();
 
                               try {
-                                /**
+                                /*
                                  * Small sleep creates a little overlap between tasks and increases
                                  * the chance of queue pressure.
                                  */
@@ -80,13 +80,13 @@ class CustomThreadPoolConcurrentSubmissionTest {
         submitter.start();
       }
 
-      /** Start all submitter threads at roughly the same time. */
+      /* Start all submitter threads at roughly the same time. */
       startGate.countDown();
 
       boolean allSubmittersFinished = submittersFinished.await(5, TimeUnit.SECONDS);
       assertTrue(allSubmittersFinished, "Submitter threads did not finish within the timeout");
 
-      /**
+      /*
        * After all submissions are done, start graceful shutdown. All accepted tasks must still
        * complete.
        */
@@ -99,21 +99,21 @@ class CustomThreadPoolConcurrentSubmissionTest {
 
       assertEquals(totalTasks, metrics.getSubmittedTaskCount());
 
-      /** Core consistency rule: every submitted task must be either accepted or rejected. */
+      /* Core consistency rule: every submitted task must be either accepted or rejected. */
       assertEquals(
           metrics.getSubmittedTaskCount(),
           metrics.getAcceptedTaskCount() + metrics.getRejectedTaskCount());
 
-      /** After graceful shutdown completes, all accepted tasks must be completed. */
+      /* After graceful shutdown completes, all accepted tasks must be completed. */
       assertEquals(metrics.getAcceptedTaskCount(), metrics.getCompletedTaskCount());
 
-      /** External observation of rejections should match pool metrics. */
+      /* External observation of rejections should match pool metrics. */
       assertEquals(externallyObservedRejections.get(), metrics.getRejectedTaskCount());
 
-      /** Executed task count should match completed task count. */
+      /* Executed task count should match completed task count. */
       assertEquals(actuallyExecutedTasks.get(), metrics.getCompletedTaskCount());
 
-      /** After full graceful shutdown, all workers should be gone. */
+      /* After full graceful shutdown, all workers should be gone. */
       assertEquals(0, metrics.getCurrentWorkerCount());
     } finally {
       pool.shutdownNow();

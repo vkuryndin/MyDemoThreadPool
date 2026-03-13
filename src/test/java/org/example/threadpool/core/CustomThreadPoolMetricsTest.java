@@ -50,7 +50,7 @@ class CustomThreadPoolMetricsTest {
       assertEquals(0, metrics.getRejectedTaskCount());
       assertEquals(3, metrics.getCompletedTaskCount());
 
-      /** At least one worker must have existed during execution. */
+      /* At least one worker must have existed during execution. */
       assertTrue(metrics.getPeakWorkerCount() >= 1);
     } finally {
       pool.shutdownNow();

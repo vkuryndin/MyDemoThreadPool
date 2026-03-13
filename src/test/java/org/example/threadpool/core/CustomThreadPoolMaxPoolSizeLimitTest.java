@@ -70,25 +70,25 @@ class CustomThreadPoolMaxPoolSizeLimitTest {
             // This task is used to fill the queue of worker 2.
           };
 
-      /** Task 1 starts running on worker 1. */
+      /* Task 1 starts running on worker 1. */
       pool.execute(firstTask);
 
       boolean firstStarted = firstTaskStarted.await(3, TimeUnit.SECONDS);
       assertTrue(firstStarted, "The first task did not start within the timeout");
 
-      /** Task 2 fills the queue of worker 1. */
+      /* Task 2 fills the queue of worker 1. */
       pool.execute(secondTask);
 
-      /** Task 3 should trigger pool growth and start on worker 2. */
+      /* Task 3 should trigger pool growth and start on worker 2. */
       pool.execute(thirdTask);
 
       boolean thirdStarted = thirdTaskStarted.await(3, TimeUnit.SECONDS);
       assertTrue(thirdStarted, "The third task did not start within the timeout");
 
-      /** Task 4 fills the queue of worker 2. */
+      /* Task 4 fills the queue of worker 2. */
       pool.execute(fourthTask);
 
-      /**
+      /*
        * Now all capacity is exhausted: - 2 workers exist (maxPoolSize reached) - both worker queues
        * are full
        *

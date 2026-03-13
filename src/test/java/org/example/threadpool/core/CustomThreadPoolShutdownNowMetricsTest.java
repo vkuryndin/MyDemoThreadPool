@@ -42,7 +42,7 @@ class CustomThreadPoolShutdownNowMetricsTest {
             firstTaskStarted.countDown();
 
             try {
-              /**
+              /*
                * The task waits until it is either released normally or interrupted by
                * shutdownNow().
                */
@@ -56,25 +56,25 @@ class CustomThreadPoolShutdownNowMetricsTest {
 
       Runnable secondTask =
           () -> {
-            /**
+            /*
              * This task should never run in this scenario, because it is expected to be cleared
              * from the queue.
              */
           };
 
-      /** Submit the first task and wait until it really starts running. */
+      /* Submit the first task and wait until it really starts running. */
       pool.execute(firstTask);
 
       boolean started = firstTaskStarted.await(3, TimeUnit.SECONDS);
       assertTrue(started, "The first task did not start within the timeout");
 
-      /**
+      /*
        * Submit the second task. Because the pool has only one worker, this task should be accepted
        * into the queue and remain pending there.
        */
       pool.execute(secondTask);
 
-      /**
+      /*
        * Immediate shutdown should: - interrupt the running first task - clear the queued second
        * task
        */
@@ -90,16 +90,16 @@ class CustomThreadPoolShutdownNowMetricsTest {
       assertEquals(0, metrics.getRejectedTaskCount());
       assertEquals(1, metrics.getCompletedTaskCount());
 
-      /**
+      /*
        * This is the key property of this test: one accepted task was cleared from the queue and
        * never executed.
        */
       assertTrue(metrics.getAcceptedTaskCount() > metrics.getCompletedTaskCount());
 
-      /** After shutdownNow(), pending queues should be cleared. */
+      /* After shutdownNow(), pending queues should be cleared. */
       assertEquals(0, metrics.getCurrentPendingTaskCount());
     } finally {
-      /**
+      /*
        * Release the latch just in case the task was not interrupted due to an unexpected failure
        * earlier in the test.
        */

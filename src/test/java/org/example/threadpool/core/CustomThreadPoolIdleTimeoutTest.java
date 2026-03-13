@@ -60,32 +60,32 @@ class CustomThreadPoolIdleTimeoutTest {
             allTasksCompleted.countDown();
           };
 
-      /** Task 1 starts running on the core worker. */
+      /* Task 1 starts running on the core worker. */
       pool.execute(firstTask);
 
       boolean firstStarted = firstTaskStarted.await(3, TimeUnit.SECONDS);
       assertTrue(firstStarted, "The first task did not start within the timeout");
 
-      /** Task 2 fills the queue of worker 1. */
+      /* Task 2 fills the queue of worker 1. */
       pool.execute(secondTask);
 
-      /** Task 3 should trigger creation of an extra worker. */
+      /* Task 3 should trigger creation of an extra worker. */
       pool.execute(thirdTask);
 
       boolean thirdRan = thirdTaskExecuted.await(3, TimeUnit.SECONDS);
       assertTrue(thirdRan, "The third task did not execute within the timeout");
 
-      /** At this point the pool must have grown to 2 workers. */
+      /* At this point the pool must have grown to 2 workers. */
       PoolMetricsSnapshot grownSnapshot = pool.getMetricsSnapshot();
       assertEquals(2, grownSnapshot.getPeakWorkerCount());
 
-      /** Allow the blocked first task to finish, so that the whole workload completes. */
+      /* Allow the blocked first task to finish, so that the whole workload completes. */
       releaseFirstTask.countDown();
 
       boolean allCompleted = allTasksCompleted.await(5, TimeUnit.SECONDS);
       assertTrue(allCompleted, "Not all tasks completed within the timeout");
 
-      /** Wait until the extra worker times out and the pool shrinks back. */
+      /* Wait until the extra worker times out and the pool shrinks back. */
       boolean shrunk = waitUntilWorkerCountBecomes(pool, 1, 5, TimeUnit.SECONDS);
       assertTrue(shrunk, "The pool did not shrink back to corePoolSize within the timeout");
 

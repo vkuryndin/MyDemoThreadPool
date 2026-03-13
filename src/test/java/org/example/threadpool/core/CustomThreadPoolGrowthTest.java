@@ -57,16 +57,16 @@ class CustomThreadPoolGrowthTest {
             thirdTaskExecuted.countDown();
           };
 
-      /** Submit the first task and wait until it really starts running. */
+      /* Submit the first task and wait until it really starts running. */
       pool.execute(firstTask);
 
       boolean started = firstTaskStarted.await(3, TimeUnit.SECONDS);
       assertTrue(started, "The first task did not start within the timeout");
 
-      /** Submit the second task. With one worker and queueSize = 1, this should fill the queue. */
+      /* Submit the second task. With one worker and queueSize = 1, this should fill the queue. */
       pool.execute(secondTask);
 
-      /**
+      /*
        * Submit the third task. Because the first worker is busy and its queue is full, the pool
        * should create a second worker.
        */
@@ -81,7 +81,7 @@ class CustomThreadPoolGrowthTest {
       assertEquals(3, metrics.getAcceptedTaskCount());
       assertEquals(0, metrics.getRejectedTaskCount());
 
-      /** The key assertion of this test: the pool must have grown from 1 worker to 2 workers. */
+      /* The key assertion of this test: the pool must have grown from 1 worker to 2 workers. */
       assertEquals(2, metrics.getPeakWorkerCount());
     } finally {
       releaseFirstTask.countDown();
