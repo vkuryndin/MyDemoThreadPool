@@ -25,7 +25,7 @@ public final class PoolConfig {
   /**
    * The capacity of a single worker queue.
    *
-   * <p>In our design, every worker has its own queue, so this value describes the size of one
+   * <p>Every worker has its own queue, so this value describes the size of one
    * queue.
    */
   private final int queueSize;

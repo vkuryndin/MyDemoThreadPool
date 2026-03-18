@@ -21,13 +21,16 @@ import org.example.threadpool.worker.Worker;
 import org.example.threadpool.worker.WorkerController;
 
 /**
- * This class is the main implementation of the custom thread pool.
+ * Main implementation of the custom thread pool.
  *
- * <p>At this stage, it already: - stores pool configuration and dependencies - creates core workers
- * on startup - tracks workers and their threads - exposes pool state to workers
+ * <p>This class coordinates the lifecycle of workers, distributes submitted tasks
+ * across worker queues, applies the rejection policy when the pool is overloaded,
+ * tracks runtime metrics, and supports both graceful and immediate shutdown.
  *
- * <p>Full task submission logic will be added in the next step.
+ * <p>The pool starts with the configured number of core workers and may create
+ * additional workers up to the configured maximum when load increases.
  */
+
 @SuppressWarnings("PMD.SystemPrintln")
 public final class CustomThreadPool implements CustomExecutor, WorkerController {
 
@@ -46,8 +49,7 @@ public final class CustomThreadPool implements CustomExecutor, WorkerController 
   /**
    * Active workers currently known to the pool.
    *
-   * <p>We use CopyOnWriteArrayList for simplicity and thread-safe iteration. This is acceptable
-   * here because workers are created and removed much less often than tasks are processed.
+   * <p>We use CopyOnWriteArrayList for simplicity and thread-safe iteration. This is because workers are created and removed much less often than tasks are processed.
    */
   private final List<Worker> workers = new CopyOnWriteArrayList<>();
 
@@ -257,7 +259,7 @@ public final class CustomThreadPool implements CustomExecutor, WorkerController 
   /**
    * Returns true if the pool is still allowed to create more workers.
    *
-   * @return true if current size is below maxPoolSize
+   * @return true if the current size is below maxPoolSize
    */
   public boolean canCreateMoreWorkers() {
     return getWorkerCount() < config.getMaxPoolSize();
@@ -303,7 +305,7 @@ public final class CustomThreadPool implements CustomExecutor, WorkerController 
    * Tries to assign a task to one of the existing workers.
    *
    * <p>The balancer selects the starting queue index, and then the pool performs a circular scan
-   * over all workers. This gives us a practical fallback if the first selected queue is full.
+   * over all workers.
    *
    * @param command the task to assign
    * @return true if the task was accepted, false otherwise
@@ -498,7 +500,7 @@ public final class CustomThreadPool implements CustomExecutor, WorkerController 
       /* Try to maintain the configured number of spare idle workers. */
       ensureMinSpareWorkers();
 
-      /** First try to place the task into one of the existing worker queues. */
+      /* First try to place the task into one of the existing worker queues. */
       if (tryAssignTaskToExistingWorker(trackedCommand)) {
         return;
       }
@@ -524,7 +526,7 @@ public final class CustomThreadPool implements CustomExecutor, WorkerController 
   /**
    * Submits a Callable task and returns a Future.
    *
-   * <p>We wrap the Callable into FutureTask because FutureTask is both: - a Runnable, so it can be
+   * <p>Wrapping the Callable into FutureTask because FutureTask is both: - a Runnable, so it can be
    * passed to execute() - a Future, so the caller can get the result later
    *
    * @param callable the task to submit

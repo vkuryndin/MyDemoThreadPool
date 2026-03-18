@@ -31,7 +31,7 @@ public final class Worker implements Runnable {
   /**
    * Shows whether this worker is currently executing a task.
    *
-   * <p>We mark it as volatile so that other threads can read the latest value safely.
+   * <p>Marking it as volatile so that other threads can read the latest value safely.
    */
   private volatile boolean busy;
 

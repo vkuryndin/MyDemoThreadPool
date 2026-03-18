@@ -9,7 +9,7 @@ package org.example.threadpool.worker;
 public interface WorkerController {
 
   /**
-   * Returns true if graceful shutdown was requested.
+   * Returns true if a graceful shutdown was requested.
    *
    * <p>In graceful shutdown mode, workers should stop accepting new external tasks, but they may
    * continue processing already queued tasks.

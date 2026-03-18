@@ -5,8 +5,7 @@ import java.util.concurrent.RejectedExecutionException;
 /**
  * This rejection policy always rejects the task.
  *
- * <p>It logs the rejection and throws RejectedExecutionException. This is a simple and predictable
- * strategy that is easy to explain and demonstrate in the project.
+ * <p>It logs the rejection and throws RejectedExecutionException.
  */
 @SuppressWarnings("PMD.SystemPrintln")
 public class RejectPolicy implements RejectionPolicy {
