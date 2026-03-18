@@ -3,10 +3,10 @@ package org.example.threadpool.config;
 import java.util.concurrent.TimeUnit;
 
 /**
- * This class stores all configuration parameters of the custom thread pool.
+ * Immutable configuration of the custom thread pool.
  *
- * <p>We keep pool settings in a separate object to make the code cleaner and to avoid passing many
- * constructor arguments one by one.
+ * <p>This class stores the pool size limits, idle timeout, queue capacity, and spare worker
+ * threshold.
  */
 public final class PoolConfig {
 
@@ -23,10 +23,10 @@ public final class PoolConfig {
   private final TimeUnit timeUnit;
 
   /**
-   * The capacity of a single worker queue.
+   * Capacity of a single worker queue.
    *
-   * <p>Every worker has its own queue, so this value describes the size of one
-   * queue.
+   * <p>Each worker owns its own queue, so this value describes the capacity of one queue rather
+   * than a global queue.
    */
   private final int queueSize;
 
@@ -47,9 +47,9 @@ public final class PoolConfig {
    * @param corePoolSize minimum number of worker threads
    * @param maxPoolSize maximum number of worker threads
    * @param keepAliveTime idle timeout value
-   * @param timeUnit unit of time for idle timeout
+   * @param timeUnit time unit of the idle timeout
    * @param queueSize capacity of one worker queue
-   * @param minSpareThreads minimum number of free workers to keep ready
+   * @param minSpareThreads minimum number of spare idle workers
    */
   public PoolConfig(
       int corePoolSize,
@@ -70,14 +70,14 @@ public final class PoolConfig {
   }
 
   /**
-   * Validates constructor arguments to prevent invalid pool configuration.
+   * Validates configuration values.
    *
    * @param corePoolSize minimum number of worker threads
    * @param maxPoolSize maximum number of worker threads
    * @param keepAliveTime idle timeout value
-   * @param timeUnit unit of time for idle timeout
+   * @param timeUnit time unit of the idle timeout
    * @param queueSize capacity of one worker queue
-   * @param minSpareThreads minimum number of free workers to keep ready
+   * @param minSpareThreads minimum number of spare idle workers
    */
   private void validate(
       int corePoolSize,

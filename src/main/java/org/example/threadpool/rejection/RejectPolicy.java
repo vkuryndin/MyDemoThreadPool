@@ -2,18 +2,14 @@ package org.example.threadpool.rejection;
 
 import java.util.concurrent.RejectedExecutionException;
 
-/**
- * This rejection policy always rejects the task.
- *
- * <p>It logs the rejection and throws RejectedExecutionException.
- */
+/** Rejection policy that always throws. */
 @SuppressWarnings("PMD.SystemPrintln")
 public class RejectPolicy implements RejectionPolicy {
 
   /**
-   * Rejects the given task.
+   * Logs the rejection and throws an exception.
    *
-   * @param task the task that was rejected
+   * @param task rejected task
    */
   @Override
   public void reject(Runnable task) {

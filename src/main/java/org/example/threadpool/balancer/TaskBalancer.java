@@ -1,19 +1,14 @@
 package org.example.threadpool.balancer;
 
-/**
- * This interface defines a strategy for choosing which worker queue should receive the next task.
- *
- * <p>The balancer does not need to know full worker details. It only chooses an index of the target
- * queue.
- */
+/** Strategy interface for selecting a worker queue for the next task. */
 @FunctionalInterface
 public interface TaskBalancer {
 
   /**
-   * Selects the index of the queue that should receive the next task.
+   * Returns the index of the queue that should receive the next task.
    *
-   * @param queueCount the number of available worker queues
-   * @return the index of the selected queue
+   * @param queueCount number of available worker queues
+   * @return selected queue index
    */
   int selectQueueIndex(int queueCount);
 }

@@ -5,45 +5,37 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 /**
- * A Worker is a runnable task processor that belongs to the custom thread pool.
+ * Worker bound to a single queue inside the custom pool.
  *
- * <p>Each worker has its own task queue and executes tasks from that queue. If the worker stays
- * idle longer than keepAliveTime, it may stop if the pool allows it.
+ * <p>The worker polls tasks from its queue and may terminate after being idle long enough, if the
+ * controller allows it.
  */
 @SuppressWarnings({"PMD.SystemPrintln", "PMD.UnusedAssignment", "PMD.AvoidDuplicateLiterals"})
 public final class Worker implements Runnable {
 
-  /**
-   * A reference to the pool controller. The worker uses it to check pool state and report
-   * termination.
-   */
+  /** Pool-side callback interface. */
   private final WorkerController controller;
 
-  /** The personal task queue of this worker. */
+  /** Queue assigned to this worker. */
   private final BlockingQueue<Runnable> taskQueue;
 
-  /** The maximum idle time before this worker may stop. */
+  /** Idle timeout value. */
   private final long keepAliveTime;
 
-  /** The time unit for keepAliveTime. */
+  /** Idle timeout unit. */
   private final TimeUnit timeUnit;
 
-  /**
-   * Shows whether this worker is currently executing a task.
-   *
-   * <p>Marking it as volatile so that other threads can read the latest value safely.
-   */
+  /** Flag showing whether a task is currently being executed. */
   private volatile boolean busy;
 
   /**
-   * A private lock that protects task acceptance and worker stop decision.
+   * Guards task acceptance and worker shutdown checks.
    *
-   * <p>It helps prevent a race when the worker is about to stop while another thread is trying to
-   * put a new task into its queue.
+   * <p>Without this lock, a task could be offered while the worker is already on its way out.
    */
   private final Object queueLock = new Object();
 
-  /** Shows whether this worker is still allowed to accept new tasks. */
+  /** Whether this worker can still accept new tasks. */
   private volatile boolean running;
 
   private static final int MIN_QUEUE_SIZE = 1;
@@ -51,12 +43,10 @@ public final class Worker implements Runnable {
   private static final long MIN_KEEP_ALIVE_TIME = 0L;
 
   /**
-   * Creates a worker with its own bounded task queue.
-   *
-   * @param controller the object that provides pool state and callbacks
-   * @param queueSize the capacity of this worker queue
+   * @param controller pool callback interface
+   * @param queueSize worker queue capacity
    * @param keepAliveTime idle timeout value
-   * @param timeUnit unit for idle timeout
+   * @param timeUnit idle timeout unit
    */
   public Worker(WorkerController controller, int queueSize, long keepAliveTime, TimeUnit timeUnit) {
 
@@ -85,13 +75,10 @@ public final class Worker implements Runnable {
   }
 
   /**
-   * Tries to add a task to this worker queue.
+   * Tries to enqueue a task for this worker.
    *
-   * <p>The method is synchronized with the worker stop decision, so a task cannot be added to a
-   * worker that is already stopping.
-   *
-   * @param task the task to add
-   * @return true if the task was added successfully, false otherwise
+   * @param task task to enqueue
+   * @return {@code true} if the task was accepted
    */
   public boolean offerTask(Runnable task) {
     if (task == null) {
@@ -108,39 +95,30 @@ public final class Worker implements Runnable {
   }
 
   /**
-   * Returns the current number of tasks waiting in this worker queue.
-   *
-   * @return queue size
+   * @return current queue size
    */
   public int getQueueSize() {
     return taskQueue.size();
   }
 
   /**
-   * Returns true if this worker is currently executing a task.
-   *
-   * @return true if busy, false otherwise
+   * @return {@code true} if the worker is executing a task
    */
   public boolean isBusy() {
     return busy;
   }
 
   /**
-   * Returns true if this worker still has queued tasks.
-   *
-   * @return true if the queue is not empty
+   * @return {@code true} if there are tasks waiting in the queue
    */
   public boolean hasPendingTasks() {
     return !taskQueue.isEmpty();
   }
 
   /**
-   * Removes all tasks that are still waiting in this worker queue.
+   * Removes tasks that have not started yet.
    *
-   * <p>This method does not affect the task that may already be running. It only clears tasks that
-   * have not started yet.
-   *
-   * @return the number of removed tasks
+   * @return number of removed tasks
    */
   public int clearPendingTasks() {
     synchronized (queueLock) {
@@ -150,24 +128,17 @@ public final class Worker implements Runnable {
     }
   }
 
-  /**
-   * Main worker loop.
-   *
-   * <p>The worker waits for tasks using poll(timeout). This allows it to wake up after
-   * keepAliveTime and decide whether it should stop.
-   */
+  /** Main worker loop. */
   @Override
   public void run() {
     try {
       while (true) {
-        /* If immediate shutdown was requested, stop as soon as possible. */
+        /* Stop immediately on forced shutdown. */
         if (controller.isShutdownNow()) {
           break;
         }
 
-        /*
-         * In graceful shutdown mode, the worker should finish only after its queue becomes empty.
-         */
+        /* During graceful shutdown, drain the local queue and then exit. */
         if (controller.isShutdown() && taskQueue.isEmpty()) {
           break;
         }
@@ -175,11 +146,7 @@ public final class Worker implements Runnable {
         Runnable task = taskQueue.poll(keepAliveTime, timeUnit);
 
         /*
-         * If no task was received during the idle timeout, ask the pool whether this worker may
-         * stop.
-         *
-         * <p>The stop decision is synchronized with task acceptance to avoid losing tasks during
-         * worker shutdown.
+         * No task arrived before timeout. Check whether this worker is still needed.
          */
         if (task == null) {
           synchronized (queueLock) {
@@ -194,7 +161,7 @@ public final class Worker implements Runnable {
           continue;
         }
 
-        /* If immediate shutdown started after we received the task, do not execute it. */
+        /* The task was taken, but shutdownNow() may have started meanwhile. */
         if (controller.isShutdownNow()) {
           break;
         }
@@ -202,7 +169,7 @@ public final class Worker implements Runnable {
         executeTask(task);
       }
     } catch (InterruptedException e) {
-      /* The worker may be interrupted during shutdownNow() while waiting on the queue. */
+      /* Expected path during shutdownNow() while blocked on poll(). */
       Thread.currentThread().interrupt();
     } finally {
       synchronized (queueLock) {
@@ -216,11 +183,9 @@ public final class Worker implements Runnable {
   }
 
   /**
-   * Executes a single task safely.
+   * Runs one task and keeps the worker alive even if the task fails.
    *
-   * <p>One failed task must not kill the whole worker.
-   *
-   * @param task the task to execute
+   * @param task task to execute
    */
   private void executeTask(Runnable task) {
     busy = true;

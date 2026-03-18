@@ -1,64 +1,49 @@
 package org.example.threadpool.metrics;
 
-/**
- * Immutable snapshot of the current thread pool metrics.
- *
- * <p>This object is used to safely expose internal counters and current state without giving direct
- * access to mutable fields of the pool.
- */
+/** Immutable view of current pool metrics. */
 public class PoolMetricsSnapshot {
 
-  /**
-   * Total number of tasks submitted to the pool.
-   *
-   * <p>This includes both accepted and rejected tasks.
-   */
+  /** Total number of submitted tasks, including rejected ones. */
   private final long submittedTaskCount;
 
-  /** Total number of tasks accepted by the pool. */
+  /** Total number of accepted tasks. */
   private final long acceptedTaskCount;
 
-  /** Total number of tasks rejected by the pool. */
+  /** Total number of rejected tasks. */
   private final long rejectedTaskCount;
 
-  /**
-   * Total number of tasks whose execution has finished.
-   *
-   * <p>A task is counted as completed even if it finished with an exception.
-   */
+  /** Total number of finished tasks. */
   private final long completedTaskCount;
 
-  /** Current number of worker threads known to the pool. */
+  /** Current number of registered workers. */
   private final int currentWorkerCount;
 
-  /** Current number of busy workers. */
+  /** Current number of workers running a task. */
   private final int busyWorkerCount;
 
   /** Current number of idle workers. */
   private final int idleWorkerCount;
 
-  /** Maximum number of workers observed since pool creation. */
+  /** Maximum number of workers seen since pool start. */
   private final long peakWorkerCount;
 
-  /** Current total number of pending tasks in all worker queues. */
+  /** Current total queue size across all workers. */
   private final long currentPendingTaskCount;
 
-  /** Maximum total number of pending tasks observed since pool creation. */
+  /** Highest observed total queue size across all workers. */
   private final long peakPendingTaskCount;
 
   /**
-   * Creates a new immutable metrics snapshot.
-   *
    * @param submittedTaskCount total submitted tasks
    * @param acceptedTaskCount total accepted tasks
    * @param rejectedTaskCount total rejected tasks
-   * @param completedTaskCount total completed tasks
+   * @param completedTaskCount total finished tasks
    * @param currentWorkerCount current worker count
    * @param busyWorkerCount current busy worker count
    * @param idleWorkerCount current idle worker count
    * @param peakWorkerCount peak worker count
-   * @param currentPendingTaskCount current total pending tasks
-   * @param peakPendingTaskCount peak total pending tasks
+   * @param currentPendingTaskCount current pending task count
+   * @param peakPendingTaskCount peak pending task count
    */
   public PoolMetricsSnapshot(
       long submittedTaskCount,
@@ -84,8 +69,6 @@ public class PoolMetricsSnapshot {
   }
 
   /**
-   * Returns the total number of submitted tasks.
-   *
    * @return submitted task count
    */
   public long getSubmittedTaskCount() {
@@ -93,8 +76,6 @@ public class PoolMetricsSnapshot {
   }
 
   /**
-   * Returns the total number of accepted tasks.
-   *
    * @return accepted task count
    */
   public long getAcceptedTaskCount() {
@@ -102,8 +83,6 @@ public class PoolMetricsSnapshot {
   }
 
   /**
-   * Returns the total number of rejected tasks.
-   *
    * @return rejected task count
    */
   public long getRejectedTaskCount() {
@@ -111,8 +90,6 @@ public class PoolMetricsSnapshot {
   }
 
   /**
-   * Returns the total number of completed tasks.
-   *
    * @return completed task count
    */
   public long getCompletedTaskCount() {
@@ -120,8 +97,6 @@ public class PoolMetricsSnapshot {
   }
 
   /**
-   * Returns the current number of workers.
-   *
    * @return current worker count
    */
   public int getCurrentWorkerCount() {
@@ -129,8 +104,6 @@ public class PoolMetricsSnapshot {
   }
 
   /**
-   * Returns the number of busy workers.
-   *
    * @return busy worker count
    */
   public int getBusyWorkerCount() {
@@ -138,8 +111,6 @@ public class PoolMetricsSnapshot {
   }
 
   /**
-   * Returns the number of idle workers.
-   *
    * @return idle worker count
    */
   public int getIdleWorkerCount() {
@@ -147,8 +118,6 @@ public class PoolMetricsSnapshot {
   }
 
   /**
-   * Returns the peak number of workers observed during pool lifetime.
-   *
    * @return peak worker count
    */
   public long getPeakWorkerCount() {
@@ -156,8 +125,6 @@ public class PoolMetricsSnapshot {
   }
 
   /**
-   * Returns the current number of tasks waiting in worker queues.
-   *
    * @return current pending task count
    */
   public long getCurrentPendingTaskCount() {
@@ -165,8 +132,6 @@ public class PoolMetricsSnapshot {
   }
 
   /**
-   * Returns the peak number of pending tasks observed during pool lifetime.
-   *
    * @return peak pending task count
    */
   public long getPeakPendingTaskCount() {
@@ -174,11 +139,7 @@ public class PoolMetricsSnapshot {
   }
 
   /**
-   * Returns a readable text representation of the snapshot.
-   *
-   * <p>This is useful for demo output and debugging.
-   *
-   * @return formatted metrics text
+   * @return snapshot as text
    */
   @Override
   public String toString() {

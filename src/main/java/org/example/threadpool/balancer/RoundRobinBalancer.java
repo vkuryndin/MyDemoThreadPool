@@ -3,20 +3,20 @@ package org.example.threadpool.balancer;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * This balancer distributes tasks using the Round Robin strategy.
+ * Task balancer that distributes tasks in round-robin order.
  *
- * <p>It sends tasks to queues one by one in a circular order: 0, 1, 2, 0, 1, 2, ...
+ * <p>Queue indexes are selected in a circular sequence such as {@code 0, 1, 2, 0, 1, 2}.
  */
 public class RoundRobinBalancer implements TaskBalancer {
 
-  /** A thread-safe counter used to rotate through queue indexes. */
+  /** Counter used to rotate through queue indexes. */
   private final AtomicInteger nextIndex = new AtomicInteger(0);
 
   /**
-   * Selects the next queue index in circular order.
+   * Returns the next queue index in round-robin order.
    *
-   * @param queueCount the number of available worker queues
-   * @return the selected queue index
+   * @param queueCount number of available worker queues
+   * @return selected queue index
    */
   @Override
   public int selectQueueIndex(int queueCount) {

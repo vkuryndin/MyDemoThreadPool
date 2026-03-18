@@ -23,56 +23,55 @@ import org.example.threadpool.worker.WorkerController;
 /**
  * Main implementation of the custom thread pool.
  *
- * <p>This class coordinates the lifecycle of workers, distributes submitted tasks
- * across worker queues, applies the rejection policy when the pool is overloaded,
- * tracks runtime metrics, and supports both graceful and immediate shutdown.
+ * <p>This class coordinates worker lifecycle, task submission, task distribution, overload
+ * handling, runtime metrics, and shutdown behavior.
  *
- * <p>The pool starts with the configured number of core workers and may create
- * additional workers up to the configured maximum when load increases.
+ * <p>The pool starts with the configured number of core workers and may create additional workers
+ * up to the configured maximum when load increases.
  */
-
 @SuppressWarnings("PMD.SystemPrintln")
 public final class CustomThreadPool implements CustomExecutor, WorkerController {
 
-  /** Pool configuration with all numeric limits and timing settings. */
+  /** Pool configuration with size limits, queue settings, and timing parameters. */
   private final PoolConfig config;
 
-  /** Strategy used to select a target worker queue for a new task. */
+  /** Strategy used to choose the starting queue during task assignment. */
   private final TaskBalancer taskBalancer;
 
-  /** Policy that defines what to do when the pool cannot accept a task. */
+  /** Policy applied when the pool cannot accept a task. */
   private final RejectionPolicy rejectionPolicy;
 
   /** Factory used to create worker threads with readable names. */
   private final CustomThreadFactory threadFactory;
 
   /**
-   * Active workers currently known to the pool.
+   * Active workers currently managed by the pool.
    *
-   * <p>We use CopyOnWriteArrayList for simplicity and thread-safe iteration. This is because workers are created and removed much less often than tasks are processed.
+   * <p>{@link CopyOnWriteArrayList} is used here to simplify thread-safe iteration over the worker
+   * collection.
    */
   private final List<Worker> workers = new CopyOnWriteArrayList<>();
 
   /**
-   * Mapping between a worker object and its underlying Java thread.
+   * Mapping between workers and their underlying Java threads.
    *
-   * <p>This helps us interrupt worker threads during shutdownNow().
+   * <p>This is used when worker threads need to be interrupted during immediate shutdown.
    */
   private final Map<Worker, Thread> workerThreads = new ConcurrentHashMap<>();
 
-  /** A private lock object for compound state changes. */
+  /** Lock used for compound state changes inside the pool. */
   private final Object stateLock = new Object();
 
-  /** True after graceful shutdown was requested. */
+  /** Becomes {@code true} after graceful shutdown is requested. */
   private volatile boolean shutdownRequested;
 
-  /** True after immediate shutdown was requested. */
+  /** Becomes {@code true} after immediate shutdown is requested. */
   private volatile boolean shutdownNowRequested;
 
   /**
    * Total number of tasks submitted to the pool.
    *
-   * <p>This includes both accepted and rejected tasks.
+   * <p>This counter includes both accepted and rejected tasks.
    */
   private final AtomicLong submittedTaskCount = new AtomicLong(0);
 
@@ -85,51 +84,51 @@ public final class CustomThreadPool implements CustomExecutor, WorkerController 
   /**
    * Total number of tasks whose execution has finished.
    *
-   * <p>A task is counted as completed even if it ended with an exception.
+   * <p>A task is counted as completed even if it ends with an exception.
    */
   private final AtomicLong completedTaskCount = new AtomicLong(0);
 
-  /** Peak number of workers observed since pool creation. */
+  /** Highest worker count observed since pool creation. */
   private final AtomicLong peakWorkerCount = new AtomicLong(0);
 
-  /** Peak total number of pending tasks in all worker queues. */
+  /** Highest total number of pending tasks observed since pool creation. */
   private final AtomicLong peakPendingTaskCount = new AtomicLong(0);
 
   /**
-   * Workers that have already received permission to stop because of idle timeout, but have not
-   * fully terminated yet.
+   * Workers that have already been allowed to stop after idle timeout but have not fully terminated
+   * yet.
    *
-   * <p>This reservation prevents multiple workers from stopping simultaneously and shrinking the
-   * pool below corePoolSize.
+   * <p>This reservation prevents several workers from stopping at the same time and shrinking the
+   * pool below {@code corePoolSize}.
    */
   private final Set<Worker> workersStoppingOnIdle = new HashSet<>();
 
   /**
-   * Internal wrapper around a task that increments the completed counter when task execution
-   * finishes.
+   * Runnable wrapper that increments the completed-task counter when task execution finishes.
    *
-   * <p>The wrapper delegates toString() to the original task so that logs remain readable.
+   * <p>The wrapper delegates {@code toString()} to the original task so that log messages remain
+   * readable.
    */
   private static class TrackedTask implements Runnable {
 
-    /** The original user task. */
+    /** Original user task. */
     private final Runnable delegate;
 
-    /** Counter of completed tasks. */
+    /** Counter for finished tasks. */
     private final AtomicLong completedTaskCounter;
 
     /**
      * Creates a new tracked task wrapper.
      *
-     * @param delegate the original task
-     * @param completedTaskCounter counter for completed tasks
+     * @param delegate original task
+     * @param completedTaskCounter counter of completed tasks
      */
     public TrackedTask(Runnable delegate, AtomicLong completedTaskCounter) {
       this.delegate = delegate;
       this.completedTaskCounter = completedTaskCounter;
     }
 
-    /** Executes the original task and increments the completed counter when execution finishes. */
+    /** Executes the original task and updates the completion counter afterward. */
     @Override
     public void run() {
       try {
@@ -140,7 +139,7 @@ public final class CustomThreadPool implements CustomExecutor, WorkerController 
     }
 
     /**
-     * Delegates readable text representation to the original task.
+     * Returns the string representation of the original task.
      *
      * @return original task text
      */
@@ -151,7 +150,7 @@ public final class CustomThreadPool implements CustomExecutor, WorkerController 
   }
 
   /**
-   * Creates a new custom thread pool and immediately starts core workers.
+   * Creates a new custom thread pool and starts core workers immediately.
    *
    * @param poolName logical pool name used in worker thread names
    * @param config pool configuration
@@ -187,7 +186,7 @@ public final class CustomThreadPool implements CustomExecutor, WorkerController 
     startCoreWorkers();
   }
 
-  /** Starts the initial number of core workers defined by corePoolSize. */
+  /** Starts the initial set of workers defined by {@code corePoolSize}. */
   private void startCoreWorkers() {
     for (int i = 0; i < config.getCorePoolSize(); i++) {
       createAndStartWorker();
@@ -195,12 +194,12 @@ public final class CustomThreadPool implements CustomExecutor, WorkerController 
   }
 
   /**
-   * Creates a new worker, creates a thread for it, stores references, and starts execution.
+   * Creates a worker, creates a thread for it, stores internal references, and starts the thread.
    *
-   * <p>This method returns the created worker so that the pool may immediately assign a task to it
-   * if needed.
+   * <p>The created worker is returned so that the pool may immediately try to assign a task to it
+   * if necessary.
    *
-   * @return the created worker
+   * @return created worker
    */
   private Worker createAndStartWorker() {
     synchronized (stateLock) {
@@ -222,7 +221,7 @@ public final class CustomThreadPool implements CustomExecutor, WorkerController 
   /**
    * Returns the current number of active workers.
    *
-   * @return number of workers
+   * @return worker count
    */
   public int getWorkerCount() {
     return workers.size();
@@ -231,9 +230,9 @@ public final class CustomThreadPool implements CustomExecutor, WorkerController 
   /**
    * Returns the current number of busy workers.
    *
-   * <p>A worker is considered busy if it is currently executing a task.
+   * <p>A worker is considered busy while it is executing a task.
    *
-   * @return number of busy workers
+   * @return busy worker count
    */
   public int getBusyWorkerCount() {
     int busyCount = 0;
@@ -250,26 +249,26 @@ public final class CustomThreadPool implements CustomExecutor, WorkerController 
   /**
    * Returns the current number of idle workers.
    *
-   * @return number of idle workers
+   * @return idle worker count
    */
   public int getIdleWorkerCount() {
     return getWorkerCount() - getBusyWorkerCount();
   }
 
   /**
-   * Returns true if the pool is still allowed to create more workers.
+   * Returns {@code true} if the pool is still allowed to create more workers.
    *
-   * @return true if the current size is below maxPoolSize
+   * @return {@code true} when the current worker count is below {@code maxPoolSize}
    */
   public boolean canCreateMoreWorkers() {
     return getWorkerCount() < config.getMaxPoolSize();
   }
 
   /**
-   * Tries to keep at least minSpareThreads idle workers available.
+   * Ensures that the pool tries to keep the configured number of spare idle workers.
    *
-   * <p>If the number of idle workers is below the configured minimum and the pool can still grow,
-   * new workers are created.
+   * <p>If the number of idle workers is below {@code minSpareThreads} and the pool can still grow,
+   * additional workers are created.
    */
   private void ensureMinSpareWorkers() {
     while (getIdleWorkerCount() < config.getMinSpareThreads() && canCreateMoreWorkers()) {
@@ -278,9 +277,9 @@ public final class CustomThreadPool implements CustomExecutor, WorkerController 
   }
 
   /**
-   * Returns an immutable snapshot of current pool metrics.
+   * Returns an immutable snapshot of current runtime metrics.
    *
-   * @return current metrics snapshot
+   * @return metrics snapshot
    */
   public PoolMetricsSnapshot getMetricsSnapshot() {
     int currentWorkers = getWorkerCount();
@@ -304,11 +303,11 @@ public final class CustomThreadPool implements CustomExecutor, WorkerController 
   /**
    * Tries to assign a task to one of the existing workers.
    *
-   * <p>The balancer selects the starting queue index, and then the pool performs a circular scan
-   * over all workers.
+   * <p>The balancer provides the starting queue index, and the pool then performs a circular scan
+   * over all current workers.
    *
-   * @param command the task to assign
-   * @return true if the task was accepted, false otherwise
+   * @param command task to assign
+   * @return {@code true} if the task was accepted, {@code false} otherwise
    */
   private boolean tryAssignTaskToExistingWorker(Runnable command) {
     List<Worker> snapshot = new ArrayList<>(workers);
@@ -334,7 +333,7 @@ public final class CustomThreadPool implements CustomExecutor, WorkerController 
   }
 
   /**
-   * Wraps a task so that pool metrics can count completed executions.
+   * Wraps a task so that task completion is reflected in pool metrics.
    *
    * @param command original task
    * @return wrapped task
@@ -344,9 +343,9 @@ public final class CustomThreadPool implements CustomExecutor, WorkerController 
   }
 
   /**
-   * Updates the peak worker count if the observed value is greater.
+   * Updates the peak worker count if the currently observed value is greater.
    *
-   * @param observedWorkerCount current observed worker count
+   * @param observedWorkerCount currently observed worker count
    */
   private void updatePeakWorkerCount(long observedWorkerCount) {
     while (true) {
@@ -363,7 +362,7 @@ public final class CustomThreadPool implements CustomExecutor, WorkerController 
   }
 
   /**
-   * Returns the current total number of pending tasks in all worker queues.
+   * Returns the current total number of tasks waiting in all worker queues.
    *
    * @return total pending task count
    */
@@ -377,7 +376,7 @@ public final class CustomThreadPool implements CustomExecutor, WorkerController 
     return totalPending;
   }
 
-  /** Updates the peak pending task count based on the current queue load. */
+  /** Updates the peak pending-task counter using the current queue load. */
   private void updatePeakPendingTaskCount() {
     long observedPending = getTotalPendingTaskCount();
 
@@ -394,16 +393,16 @@ public final class CustomThreadPool implements CustomExecutor, WorkerController 
     }
   }
 
-  /** Increments the accepted task counter and refreshes peak pending load. */
+  /** Increments the accepted-task counter and refreshes peak pending load. */
   private void recordTaskAccepted() {
     acceptedTaskCount.incrementAndGet();
     updatePeakPendingTaskCount();
   }
 
   /**
-   * Increments the rejected task counter and applies rejection policy.
+   * Increments the rejected-task counter and applies the rejection policy.
    *
-   * @param task the rejected task
+   * @param task rejected task
    */
   private void rejectTask(Runnable task) {
     rejectedTaskCount.incrementAndGet();
@@ -411,9 +410,9 @@ public final class CustomThreadPool implements CustomExecutor, WorkerController 
   }
 
   /**
-   * Returns true if graceful shutdown was requested.
+   * Returns {@code true} if graceful shutdown was requested.
    *
-   * @return true if shutdown() has been called
+   * @return {@code true} if {@link #shutdown()} has been called
    */
   @Override
   public boolean isShutdown() {
@@ -421,9 +420,9 @@ public final class CustomThreadPool implements CustomExecutor, WorkerController 
   }
 
   /**
-   * Returns true if immediate shutdown was requested.
+   * Returns {@code true} if immediate shutdown was requested.
    *
-   * @return true if shutdownNow() has been called
+   * @return {@code true} if {@link #shutdownNow()} has been called
    */
   @Override
   public boolean isShutdownNow() {
@@ -432,16 +431,16 @@ public final class CustomThreadPool implements CustomExecutor, WorkerController 
 
   /**
    * Allows a worker to stop after idle timeout only if the effective worker count is still greater
-   * than corePoolSize.
+   * than {@code corePoolSize}.
    *
-   * <p>Effective worker count means: current workers minus workers that have already reserved idle
-   * termination.
+   * <p>The effective worker count is calculated as the current worker count minus the number of
+   * workers that have already reserved idle termination.
    *
-   * <p>This prevents two or more workers from stopping at the same time and shrinking the pool
-   * below corePoolSize.
+   * <p>This prevents multiple workers from stopping at the same time and shrinking the pool below
+   * the configured core size.
    *
-   * @param worker the worker that asks for permission to stop
-   * @return true if this worker may stop
+   * @param worker worker requesting permission to stop
+   * @return {@code true} if this worker may stop
    */
   @Override
   public boolean shouldWorkerStopOnIdle(Worker worker) {
@@ -458,9 +457,9 @@ public final class CustomThreadPool implements CustomExecutor, WorkerController 
   }
 
   /**
-   * Removes the terminated worker from internal collections.
+   * Removes a terminated worker from internal collections.
    *
-   * @param worker the worker that has terminated
+   * @param worker terminated worker
    */
   @Override
   public void onWorkerTerminated(Worker worker) {
@@ -472,13 +471,14 @@ public final class CustomThreadPool implements CustomExecutor, WorkerController 
   }
 
   /**
-   * Executes a Runnable task.
+   * Executes a {@link Runnable} task.
    *
-   * <p>The pool first checks shutdown state, then tries to keep enough spare workers, then tries to
-   * place the task into an existing worker queue. If all existing queues are full, the pool may
-   * create a new worker. If that also fails, the rejection policy is applied.
+   * <p>The pool first checks its shutdown state, then tries to maintain the configured number of
+   * spare idle workers, then attempts to place the task into an existing queue. If all current
+   * queues are full, the pool may create a new worker. If the task still cannot be accepted, the
+   * rejection policy is applied.
    *
-   * @param command the task to execute
+   * @param command task to execute
    */
   @Override
   public void execute(Runnable command) {
@@ -491,21 +491,21 @@ public final class CustomThreadPool implements CustomExecutor, WorkerController 
     Runnable trackedCommand = wrapWithMetrics(command);
 
     synchronized (stateLock) {
-      /* The pool must not accept new tasks after shutdown starts. */
+      // The pool must not accept new tasks after shutdown starts.
       if (shutdownRequested || shutdownNowRequested) {
         rejectTask(trackedCommand);
         return;
       }
 
-      /* Try to maintain the configured number of spare idle workers. */
+      // Try to maintain the configured number of spare idle workers.
       ensureMinSpareWorkers();
 
-      /* First try to place the task into one of the existing worker queues. */
+      // First try to place the task into one of the existing worker queues.
       if (tryAssignTaskToExistingWorker(trackedCommand)) {
         return;
       }
 
-      /* If all existing queues are full, try to grow the pool. */
+      // If all current queues are full, try to grow the pool.
       if (canCreateMoreWorkers()) {
         Worker newWorker = createAndStartWorker();
 
@@ -518,20 +518,20 @@ public final class CustomThreadPool implements CustomExecutor, WorkerController 
         }
       }
 
-      /* If nothing helped, apply the overload policy. */
+      // If the task still cannot be accepted, apply the overload policy.
       rejectTask(trackedCommand);
     }
   }
 
   /**
-   * Submits a Callable task and returns a Future.
+   * Submits a {@link Callable} task and returns a {@link Future}.
    *
-   * <p>Wrapping the Callable into FutureTask because FutureTask is both: - a Runnable, so it can be
-   * passed to execute() - a Future, so the caller can get the result later
+   * <p>The callable is wrapped into {@link FutureTask} so that it can be executed through the same
+   * internal pipeline as {@link Runnable} tasks while still exposing a result to the caller.
    *
-   * @param callable the task to submit
-   * @param <T> the result type
-   * @return Future with task result
+   * @param callable task to submit
+   * @param <T> result type
+   * @return future representing the pending result
    */
   @Override
   public <T> Future<T> submit(Callable<T> callable) {
@@ -547,8 +547,8 @@ public final class CustomThreadPool implements CustomExecutor, WorkerController 
   /**
    * Starts graceful shutdown.
    *
-   * <p>After this call, the pool stops accepting new tasks. Already queued tasks may still be
-   * processed by workers.
+   * <p>After this call, the pool stops accepting new tasks. Tasks that have already been accepted
+   * may still be processed by workers.
    */
   @Override
   public void shutdown() {
@@ -569,7 +569,7 @@ public final class CustomThreadPool implements CustomExecutor, WorkerController 
   /**
    * Starts immediate shutdown.
    *
-   * <p>After this call, the pool stops accepting new tasks, clears all pending tasks from worker
+   * <p>After this call, the pool stops accepting new tasks, clears pending tasks from worker
    * queues, and interrupts worker threads.
    */
   @Override

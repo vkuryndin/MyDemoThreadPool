@@ -5,49 +5,41 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
 
 /**
- * This interface describes the public contract of our custom thread pool.
+ * Public API of the custom thread pool.
  *
- * <p>It extends Executor so that the pool can be used in a standard way for running Runnable tasks.
- *
- * <p>We also add submit(), shutdown(), and shutdownNow() methods because the task requires support
- * for both direct task execution and task submission with Future results.
+ * <p>In addition to {@link Executor#execute(Runnable)}, the interface provides methods for task
+ * submission with results and for pool shutdown control.
  */
 public interface CustomExecutor extends Executor {
 
   /**
-   * Executes a Runnable task.
+   * Executes a {@link Runnable} task.
    *
-   * <p>This method is inherited from Executor, but we redeclare it here explicitly to make the
-   * contract of our custom executor clearer.
-   *
-   * @param command the task to execute
+   * @param command task to execute
    */
   @Override
   void execute(Runnable command);
 
   /**
-   * Submits a Callable task for execution and returns a Future object that can be used to get the
-   * result later.
+   * Submits a {@link Callable} task for execution.
    *
-   * @param callable the task that returns a result
-   * @param <T> the type of the result
-   * @return a Future representing the pending result
+   * @param callable task to execute
+   * @param <T> result type
+   * @return future representing the pending result
    */
   <T> Future<T> submit(Callable<T> callable);
 
   /**
-   * Starts a graceful shutdown.
+   * Starts graceful shutdown.
    *
-   * <p>After this call, the pool should stop accepting new tasks, but it should continue processing
-   * tasks that were already accepted.
+   * <p>New tasks are no longer accepted, but already accepted tasks may still run.
    */
   void shutdown();
 
   /**
-   * Starts an immediate shutdown.
+   * Starts immediate shutdown.
    *
-   * <p>After this call, the pool should stop accepting new tasks, clear pending tasks if needed,
-   * and interrupt worker threads.
+   * <p>New tasks are rejected, pending tasks may be cleared, and worker threads may be interrupted.
    */
   void shutdownNow();
 }

@@ -1,24 +1,21 @@
 package org.example.threadpool.demo;
 
 /**
- * A simple demo task used to test the custom thread pool.
+ * Test runnable used by the demo.
  *
- * <p>This task simulates real work by sleeping for a given amount of time. It also prints readable
- * log messages so that we can observe how tasks are executed by different worker threads.
+ * <p>Sleeps for the configured time and writes basic start/finish messages to the console.
  */
 @SuppressWarnings("PMD.SystemPrintln")
 public final class DemoTask implements Runnable {
 
-  /** A readable task name used in logs. */
+  /** Task name shown in the log output. */
   private final String taskName;
 
-  /** Simulated execution time in milliseconds. */
+  /** Artificial execution time. */
   private final long workTimeMillis;
 
   /**
-   * Creates a new demo task.
-   *
-   * @param taskName readable task name
+   * @param taskName task name for log output
    * @param workTimeMillis simulated execution time in milliseconds
    */
   public DemoTask(String taskName, long workTimeMillis) {
@@ -34,14 +31,7 @@ public final class DemoTask implements Runnable {
     this.workTimeMillis = workTimeMillis;
   }
 
-  /**
-   * Simulates task execution.
-   *
-   * <p>The task logs its start, sleeps for the configured time, and then logs completion.
-   *
-   * <p>If the thread is interrupted, the task restores the interrupted flag and prints a log
-   * message.
-   */
+  /** Runs the demo task. */
   @Override
   public void run() {
     String threadName = Thread.currentThread().getName();
@@ -58,11 +48,7 @@ public final class DemoTask implements Runnable {
   }
 
   /**
-   * Returns a readable task description.
-   *
-   * <p>This is important because the pool logs task objects directly.
-   *
-   * @return readable task text
+   * @return string form used in logs
    */
   @Override
   public String toString() {

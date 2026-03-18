@@ -3,24 +3,18 @@ package org.example.threadpool.factory;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * This class is responsible for creating worker threads for the custom pool.
- *
- * <p>It gives each thread a unique name and logs the thread creation event.
- */
+/** Creates worker threads for the pool. */
 @SuppressWarnings("PMD.SystemPrintln")
 public final class CustomThreadFactory implements ThreadFactory {
 
-  /** The logical name of the pool. It will be used as a prefix for worker thread names. */
+  /** Pool name used as a thread name prefix. */
   private final String poolName;
 
-  /** A thread-safe counter used to generate unique worker numbers. */
+  /** Counter for worker thread names. */
   private final AtomicInteger threadCounter = new AtomicInteger(1);
 
   /**
-   * Creates a new thread factory for the given pool name.
-   *
-   * @param poolName the name of the pool
+   * @param poolName logical pool name
    */
   public CustomThreadFactory(String poolName) {
     if (poolName == null || poolName.isBlank()) {
@@ -31,12 +25,10 @@ public final class CustomThreadFactory implements ThreadFactory {
   }
 
   /**
-   * Creates a new thread with a unique name.
+   * Creates the next worker thread.
    *
-   * <p>Example: MyPool-worker-1 MyPool-worker-2
-   *
-   * @param runnable the task that the new thread will run
-   * @return a new Thread object
+   * @param runnable runnable to execute in the new thread
+   * @return new worker thread
    */
   @Override
   public Thread newThread(Runnable runnable) {

@@ -3,24 +3,21 @@ package org.example.threadpool.demo;
 import java.util.concurrent.Callable;
 
 /**
- * A simple demo Callable task used to test submit() and Future results.
+ * Test callable used in demo scenarios.
  *
- * <p>This task simulates work by sleeping for a given amount of time and then returns a readable
- * result string.
+ * <p>Sleeps for the configured time and then returns a result string.
  */
 @SuppressWarnings("PMD.SystemPrintln")
 public final class DemoCallableTask implements Callable<String> {
 
-  /** A readable task name used in logs. */
+  /** Task name shown in the log output. */
   private final String taskName;
 
-  /** Simulated execution time in milliseconds. */
+  /** Artificial execution time. */
   private final long workTimeMillis;
 
   /**
-   * Creates a new demo callable task.
-   *
-   * @param taskName readable task name
+   * @param taskName task name for log output
    * @param workTimeMillis simulated execution time in milliseconds
    */
   public DemoCallableTask(String taskName, long workTimeMillis) {
@@ -37,10 +34,10 @@ public final class DemoCallableTask implements Callable<String> {
   }
 
   /**
-   * Simulates task execution and returns a text result.
+   * Runs the task body.
    *
-   * @return a readable result string
-   * @throws Exception if the task is interrupted
+   * @return task result
+   * @throws Exception if execution is interrupted
    */
   @Override
   public String call() throws Exception {
@@ -63,9 +60,7 @@ public final class DemoCallableTask implements Callable<String> {
   }
 
   /**
-   * Returns a readable task description.
-   *
-   * @return readable task text
+   * @return string form used in logs
    */
   @Override
   public String toString() {
