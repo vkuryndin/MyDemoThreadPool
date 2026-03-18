@@ -4,7 +4,7 @@
 
 This project implements a custom thread pool in Java without using `ThreadPoolExecutor`.
 
-The goal of the project is to simulate the behavior of a configurable server-side task execution system that can process tasks concurrently, distribute them between worker threads, handle overload situations, and support both graceful and immediate shutdown.
+It simulates a configurable server-side task execution system capable of processing tasks concurrently, distributing them across worker threads, handling system overload, and supporting graceful shutdown procedures..
 
 The implementation was developed as part of a course project and demonstrates several important concurrency and system design concepts:
 
@@ -62,7 +62,7 @@ Several design decisions were made during the implementation.
 
 Each worker owns its own bounded `BlockingQueue<Runnable>`.
 
-This approach matches the task statement, where task distribution between several queues is explicitly allowed. It also makes the architecture easier to understand: a worker only processes tasks from its own queue.
+This approach matches the task statement, where task distribution between several queues is explicitly allowed. 
 
 ### 2. `queueSize` is interpreted as the size of one worker queue
 
@@ -78,8 +78,6 @@ The pool tries to keep at least a configured number of idle workers available.
 
 If the number of free workers becomes too low and the pool has not yet reached `maxPoolSize`, it may create new workers in advance.
 
-This helps reduce latency when new tasks arrive.
-
 ### 4. The balancing strategy is replaceable
 
 Task distribution is not hardcoded directly inside the pool.
@@ -94,7 +92,6 @@ The current implementation uses `RoundRobinBalancer` as the default strategy.
 A worker represents task-processing logic, not the thread object itself.
 
 Actual Java threads are created by a custom `ThreadFactory`.  
-This separation makes the design cleaner and closer to common concurrency best practices.
 
 ### 6. `submit()` is implemented through `FutureTask`
 
@@ -105,8 +102,6 @@ This allows the pool to reuse the same internal task execution pipeline that is 
 ### 7. Console logging is used instead of a full logging framework
 
 For simplicity and educational clarity, the project uses `System.out.println(...)` for logging (the same as in the task statement).
-
-This is enough to observe the lifecycle of the pool and task execution flow, even though a production-ready system would normally use a real logging framework.
 
 ### 8. `shutdown()` and `shutdownNow()` have different semantics
 
@@ -253,7 +248,6 @@ The class also validates input values to prevent invalid pool configuration, suc
 - invalid queue size
 - invalid spare thread count
 
-This makes pool initialization safer and easier to understand.
 
 ### `CustomThreadPool`
 
@@ -314,7 +308,7 @@ Example thread names:
 - `MyPool-worker-1`
 - `MyPool-worker-2`
 
-This class also logs thread creation events, which makes debugging and demonstration easier.
+This class also logs thread creation events.
 
 ### `TaskBalancer`
 
@@ -358,8 +352,6 @@ When a task cannot be accepted, this policy:
 
 1. logs the rejection
 2. throws `RejectedExecutionException`
-
-This approach is straightforward, explicit, and easy to demonstrate.
 
 ---
 
@@ -1030,7 +1022,7 @@ This test is useful for detecting race conditions and inconsistencies in counter
 
 ### Why these tests are important
 
-This project is highly concurrent, which means that some errors cannot be found by simple functional checks alone.
+This course work is highly concurrent, which means that some errors cannot be found by simple functional checks alone.
 
 Several tests were intentionally written around:
 
@@ -1057,13 +1049,11 @@ Instead, the goal is to provide strong coverage for:
 - runtime metrics
 - important concurrency edge cases
 
-For an educational custom thread pool project, this level of testing provides solid confidence in the correctness of the core behavior.
-
 ---
 
 ## Performance Notes
 
-This project was implemented primarily as an educational custom thread pool (as course work statement defines), not as a production-ready high-performance replacement for `ThreadPoolExecutor`.
+This project was implemented primarily as an educational custom thread pool (as a course work statement defines), not as a production-ready high-performance replacement for `ThreadPoolExecutor`.
 
 At the same time, the current version already includes **built-in runtime metrics**, which makes it possible to observe real pool behavior during demo execution instead of relying only on theoretical assumptions.
 
@@ -1403,7 +1393,7 @@ This would make the performance analysis more rigorous and easier to compare acr
 
 ## Conclusion
 
-This project implements a custom configurable thread pool in Java and demonstrates the core ideas behind concurrent task execution systems.
+This course work implements a custom configurable thread pool in Java and demonstrates the core ideas behind concurrent task execution systems.
 
 The implementation supports:
 
