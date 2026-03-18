@@ -174,27 +174,27 @@ public class Main {
 
     /* Small pool: low ceiling and short queues. */
     runSingleConfigurationCase(
-            "Config A (small)",
-            new PoolConfig(1, 2, 5, TimeUnit.SECONDS, 1, 0),
-            taskCount,
-            taskDurationMillis,
-            waitAfterShutdownMillis);
+        "Config A (small)",
+        new PoolConfig(1, 2, 5, TimeUnit.SECONDS, 1, 0),
+        taskCount,
+        taskDurationMillis,
+        waitAfterShutdownMillis);
 
     /* Medium pool: close to the default demo setup. */
     runSingleConfigurationCase(
-            "Config B (medium)",
-            new PoolConfig(2, 4, 5, TimeUnit.SECONDS, 2, 1),
-            taskCount,
-            taskDurationMillis,
-            waitAfterShutdownMillis);
+        "Config B (medium)",
+        new PoolConfig(2, 4, 5, TimeUnit.SECONDS, 2, 1),
+        taskCount,
+        taskDurationMillis,
+        waitAfterShutdownMillis);
 
     /* Larger pool: more workers and more room in queues. */
     runSingleConfigurationCase(
-            "Config C (large)",
-            new PoolConfig(3, 6, 5, TimeUnit.SECONDS, 4, 1),
-            taskCount,
-            taskDurationMillis,
-            waitAfterShutdownMillis);
+        "Config C (large)",
+        new PoolConfig(3, 6, 5, TimeUnit.SECONDS, 4, 1),
+        taskCount,
+        taskDurationMillis,
+        waitAfterShutdownMillis);
   }
 
   /**
@@ -236,21 +236,21 @@ public class Main {
    * @param endNanos scenario end time
    */
   private static void printMetricsSummary(
-          String demoName, CustomThreadPool pool, long startNanos, long endNanos) {
+      String demoName, CustomThreadPool pool, long startNanos, long endNanos) {
     PoolMetricsSnapshot metrics = pool.getMetricsSnapshot();
 
     double durationSeconds = (endNanos - startNanos) / 1_000_000_000.0;
 
     double acceptedThroughput =
-            durationSeconds > 0 ? metrics.getAcceptedTaskCount() / durationSeconds : 0.0;
+        durationSeconds > 0 ? metrics.getAcceptedTaskCount() / durationSeconds : 0.0;
 
     double completedThroughput =
-            durationSeconds > 0 ? metrics.getCompletedTaskCount() / durationSeconds : 0.0;
+        durationSeconds > 0 ? metrics.getCompletedTaskCount() / durationSeconds : 0.0;
 
     double rejectionRate =
-            metrics.getSubmittedTaskCount() > 0
-                    ? (metrics.getRejectedTaskCount() * 100.0) / metrics.getSubmittedTaskCount()
-                    : 0.0;
+        metrics.getSubmittedTaskCount() > 0
+            ? (metrics.getRejectedTaskCount() * 100.0) / metrics.getSubmittedTaskCount()
+            : 0.0;
 
     System.out.println("\n----- " + demoName + " metrics summary -----");
     System.out.println("Submitted tasks      : " + metrics.getSubmittedTaskCount());
