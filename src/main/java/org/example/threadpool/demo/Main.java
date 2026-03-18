@@ -11,10 +11,10 @@ import org.example.threadpool.metrics.PoolMetricsSnapshot;
 import org.example.threadpool.rejection.RejectPolicy;
 
 /**
- * Demo entry point for the custom thread pool project.
+ * Entry point for thread pool demo runs.
  *
- * <p>This class demonstrates: - execute(Runnable) - overload and rejection - graceful shutdown() -
- * submit(Callable) with Future - shutdownNow() with task interruption
+ * <p>Contains a few standalone scenarios: basic execution, callable submission, immediate shutdown,
+ * and a comparison of several pool configurations.
  */
 @SuppressWarnings("PMD.SystemPrintln")
 public class Main {
@@ -24,10 +24,10 @@ public class Main {
   private static final String SECTION_HEADER_PREFIX = "\n==============================";
 
   /**
-   * Starts all demo scenarios one by one.
+   * Runs all demo scenarios.
    *
-   * @param args command-line arguments (not used here)
-   * @throws Exception if the main thread is interrupted
+   * @param args command-line arguments
+   * @throws Exception if the current thread is interrupted
    */
   public static void main(String[] args) throws Exception {
     runExecuteAndShutdownDemo();
@@ -40,18 +40,18 @@ public class Main {
 
     runShutdownNowDemo();
 
-    // added new demo here
+    // pause before the configuration comparison block
     Thread.sleep(3000);
 
     runConfigurationComparisonDemo();
 
-    System.out.println("\n=== All demos finished ===");
+    System.out.println("=== All demos finished ===");
   }
 
   /**
-   * Demonstrates execute(Runnable), overload, rejection, and graceful shutdown.
+   * Shows normal task submission, overload handling, and graceful shutdown.
    *
-   * @throws InterruptedException if the main thread is interrupted
+   * @throws InterruptedException if the current thread is interrupted
    */
   private static void runExecuteAndShutdownDemo() throws InterruptedException {
     System.out.println(SECTION_HEADER_PREFIX);
@@ -61,12 +61,7 @@ public class Main {
     CustomThreadPool pool = createDemoPool("ExecuteDemoPool");
     long startNanos = System.nanoTime();
 
-    /*
-     * Submit many long-running tasks quickly.
-     *
-     * <p>This should demonstrate: - normal execution - queue filling - possible pool growth -
-     * rejection when overload happens
-     */
+    /* Push a burst of long tasks into the pool. */
     for (int i = 1; i <= 12; i++) {
       DemoTask task = new DemoTask("Execute-Task-" + i, 4000);
 
@@ -77,18 +72,14 @@ public class Main {
       }
     }
 
-    /* Wait a little so that tasks can start. */
+    /* Let the workers pick up part of the load. */
     Thread.sleep(7000);
 
-    /*
-     * Request graceful shutdown.
-     *
-     * <p>Already accepted tasks may continue to run.
-     */
+    /* Stop accepting new work, but let accepted tasks finish. */
     System.out.println("[Main] Calling shutdown()");
     pool.shutdown();
 
-    /* Wait so that accepted tasks can finish. */
+    /* Leave enough time for the accepted tasks to complete. */
     Thread.sleep(10000);
 
     long endNanos = System.nanoTime();
@@ -96,9 +87,9 @@ public class Main {
   }
 
   /**
-   * Demonstrates submit(Callable) and Future results.
+   * Shows {@code submit()} and reading results through {@link Future}.
    *
-   * @throws InterruptedException if the main thread is interrupted
+   * @throws InterruptedException if the current thread is interrupted
    */
   private static void runSubmitDemo() throws InterruptedException {
     System.out.println(SECTION_HEADER_PREFIX);
@@ -108,21 +99,17 @@ public class Main {
     CustomThreadPool pool = createDemoPool("SubmitDemoPool");
     long startNanos = System.nanoTime();
 
-    /* Submit several Callable tasks and store the returned futures. */
+    /* Keep futures so the results can be read later. */
     Future<String> future1 = pool.submit(new DemoCallableTask("Callable-1", 2000));
     Future<String> future2 = pool.submit(new DemoCallableTask("Callable-2", 3000));
     Future<String> future3 = pool.submit(new DemoCallableTask("Callable-3", 1000));
 
-    /*
-     * Read results from Future objects.
-     *
-     * <p>Future.get() blocks until the corresponding task is completed.
-     */
+    /* get() waits until the corresponding task is done. */
     printFutureResult("future1", future1);
     printFutureResult("future2", future2);
     printFutureResult("future3", future3);
 
-    /* Shut down the pool after all results are collected. */
+    /* Shut the pool down after all futures are resolved. */
     System.out.println("[Main] Calling shutdown()");
     pool.shutdown();
 
@@ -133,10 +120,9 @@ public class Main {
   }
 
   /**
-   * Demonstrates immediate shutdown with interruption of running tasks and clearing of waiting
-   * tasks.
+   * Shows forced shutdown with interruption of active workers and cleanup of waiting tasks.
    *
-   * @throws InterruptedException if the main thread is interrupted
+   * @throws InterruptedException if the current thread is interrupted
    */
   private static void runShutdownNowDemo() throws InterruptedException {
     System.out.println(SECTION_HEADER_PREFIX);
@@ -146,11 +132,7 @@ public class Main {
     CustomThreadPool pool = createDemoPool("ShutdownNowDemoPool");
     long startNanos = System.nanoTime();
 
-    /*
-     * Submit several long-running tasks.
-     *
-     * <p>Some tasks will start running, others may wait in queues.
-     */
+    /* Some tasks should start, the rest will remain queued. */
     for (int i = 1; i <= 8; i++) {
       DemoTask task = new DemoTask("Interrupt-Task-" + i, 10000);
 
@@ -161,18 +143,14 @@ public class Main {
       }
     }
 
-    /* Give workers time to start processing some tasks. */
+    /* Give the pool a moment to start processing. */
     Thread.sleep(2000);
 
-    /*
-     * Request immediate shutdown.
-     *
-     * <p>Waiting tasks should be removed from queues, and worker threads should be interrupted.
-     */
+    /* Force shutdown and interrupt running workers. */
     System.out.println("[Main] Calling shutdownNow()");
     pool.shutdownNow();
 
-    /* Wait to observe interruption logs. */
+    /* Keep the pause so interruption messages can be seen in the log. */
     Thread.sleep(5000);
 
     long endNanos = System.nanoTime();
@@ -180,66 +158,50 @@ public class Main {
   }
 
   /**
-   * Demonstrates how the same load behaves under different pool configurations.
+   * Runs the same workload against several pool configurations.
    *
-   * <p>This scenario runs the same number of tasks with the same task duration against several pool
-   * configurations and prints metrics for each case.
-   *
-   * @throws InterruptedException if the main thread is interrupted
+   * @throws InterruptedException if the current thread is interrupted
    */
   private static void runConfigurationComparisonDemo() throws InterruptedException {
     System.out.println(SECTION_HEADER_PREFIX);
     System.out.println("DEMO 4: configuration comparison");
     System.out.println(SECTION_LINE);
 
-    /*
-     * The same workload will be submitted to all configurations.
-     *
-     * <p>We intentionally use many tasks submitted quickly so that differences in queue capacity
-     * and worker scaling become visible.
-     */
+    /* Use identical load parameters for every configuration. */
     int taskCount = 20;
     long taskDurationMillis = 2000;
     long waitAfterShutdownMillis = 10000;
 
-    /*
-     * Small configuration: - low core size - low max size - small queue
-     *
-     * <p>Expected behavior: more rejection and lower peak capacity.
-     */
+    /* Small pool: low ceiling and short queues. */
     runSingleConfigurationCase(
-        "Config A (small)",
-        new PoolConfig(1, 2, 5, TimeUnit.SECONDS, 1, 0),
-        taskCount,
-        taskDurationMillis,
-        waitAfterShutdownMillis);
+            "Config A (small)",
+            new PoolConfig(1, 2, 5, TimeUnit.SECONDS, 1, 0),
+            taskCount,
+            taskDurationMillis,
+            waitAfterShutdownMillis);
 
-    /* Medium configuration: balanced settings close to the main demo pool. */
+    /* Medium pool: close to the default demo setup. */
     runSingleConfigurationCase(
-        "Config B (medium)",
-        new PoolConfig(2, 4, 5, TimeUnit.SECONDS, 2, 1),
-        taskCount,
-        taskDurationMillis,
-        waitAfterShutdownMillis);
+            "Config B (medium)",
+            new PoolConfig(2, 4, 5, TimeUnit.SECONDS, 2, 1),
+            taskCount,
+            taskDurationMillis,
+            waitAfterShutdownMillis);
 
-    /*
-     * Larger configuration: more workers and larger queues.
-     *
-     * <p>Expected behavior: fewer rejections and higher acceptance capacity.
-     */
+    /* Larger pool: more workers and more room in queues. */
     runSingleConfigurationCase(
-        "Config C (large)",
-        new PoolConfig(3, 6, 5, TimeUnit.SECONDS, 4, 1),
-        taskCount,
-        taskDurationMillis,
-        waitAfterShutdownMillis);
+            "Config C (large)",
+            new PoolConfig(3, 6, 5, TimeUnit.SECONDS, 4, 1),
+            taskCount,
+            taskDurationMillis,
+            waitAfterShutdownMillis);
   }
 
   /**
-   * Creates a demo pool with the default configuration used in main scenarios.
+   * Builds the default pool used by the main demo scenarios.
    *
    * @param poolName logical pool name
-   * @return a configured CustomThreadPool
+   * @return configured pool instance
    */
   private static CustomThreadPool createDemoPool(String poolName) {
     PoolConfig config = new PoolConfig(2, 4, 5, TimeUnit.SECONDS, 2, 1);
@@ -248,10 +210,10 @@ public class Main {
   }
 
   /**
-   * Prints the result of a Future in a safe and readable way.
+   * Prints a single future result without aborting the whole demo on failure.
    *
-   * @param futureName readable future name
-   * @param future the future to read
+   * @param futureName name shown in the output
+   * @param future future to read
    */
   private static void printFutureResult(String futureName, Future<String> future) {
     try {
@@ -266,29 +228,29 @@ public class Main {
   }
 
   /**
-   * Prints a readable summary of pool metrics for one demo scenario.
+   * Prints a short metrics report for one demo block.
    *
-   * @param demoName readable scenario name
-   * @param pool the pool whose metrics should be printed
-   * @param startNanos scenario start time in nanoseconds
-   * @param endNanos scenario end time in nanoseconds
+   * @param demoName scenario name
+   * @param pool pool instance
+   * @param startNanos scenario start time
+   * @param endNanos scenario end time
    */
   private static void printMetricsSummary(
-      String demoName, CustomThreadPool pool, long startNanos, long endNanos) {
+          String demoName, CustomThreadPool pool, long startNanos, long endNanos) {
     PoolMetricsSnapshot metrics = pool.getMetricsSnapshot();
 
     double durationSeconds = (endNanos - startNanos) / 1_000_000_000.0;
 
     double acceptedThroughput =
-        durationSeconds > 0 ? metrics.getAcceptedTaskCount() / durationSeconds : 0.0;
+            durationSeconds > 0 ? metrics.getAcceptedTaskCount() / durationSeconds : 0.0;
 
     double completedThroughput =
-        durationSeconds > 0 ? metrics.getCompletedTaskCount() / durationSeconds : 0.0;
+            durationSeconds > 0 ? metrics.getCompletedTaskCount() / durationSeconds : 0.0;
 
     double rejectionRate =
-        metrics.getSubmittedTaskCount() > 0
-            ? (metrics.getRejectedTaskCount() * 100.0) / metrics.getSubmittedTaskCount()
-            : 0.0;
+            metrics.getSubmittedTaskCount() > 0
+                    ? (metrics.getRejectedTaskCount() * 100.0) / metrics.getSubmittedTaskCount()
+                    : 0.0;
 
     System.out.println("\n----- " + demoName + " metrics summary -----");
     System.out.println("Submitted tasks      : " + metrics.getSubmittedTaskCount());
@@ -308,14 +270,14 @@ public class Main {
   }
 
   /**
-   * Runs one load case for one specific pool configuration.
+   * Runs one workload against one configuration.
    *
-   * @param caseName readable configuration label
+   * @param caseName label shown in the output
    * @param config pool configuration
    * @param taskCount number of tasks to submit
    * @param taskDurationMillis duration of each task
-   * @param waitAfterShutdownMillis wait time after shutdown
-   * @throws InterruptedException if the main thread is interrupted
+   * @param waitAfterShutdownMillis pause after shutdown
+   * @throws InterruptedException if the current thread is interrupted
    */
   private static void runSingleConfigurationCase(
       String caseName,
@@ -339,7 +301,7 @@ public class Main {
 
     long startNanos = System.nanoTime();
 
-    /* Submit the same workload for every configuration. */
+    /* Submit the same batch for each configuration. */
     for (int i = 1; i <= taskCount; i++) {
       DemoTask task = new DemoTask(caseName + "-Task-" + i, taskDurationMillis);
 
@@ -350,10 +312,10 @@ public class Main {
       }
     }
 
-    /* Graceful shutdown is used so that all accepted tasks have a chance to complete. */
+    /* Use graceful shutdown so accepted tasks can finish normally. */
     pool.shutdown();
 
-    /* Wait long enough for accepted tasks to finish. */
+    /* Wait for the accepted tasks to drain. */
     Thread.sleep(waitAfterShutdownMillis);
 
     long endNanos = System.nanoTime();
@@ -362,11 +324,11 @@ public class Main {
   }
 
   /**
-   * Creates a pool with a custom configuration.
+   * Builds a pool with the given name and configuration.
    *
    * @param poolName logical pool name
    * @param config pool configuration
-   * @return configured custom thread pool
+   * @return configured pool instance
    */
   private static CustomThreadPool createPool(String poolName, PoolConfig config) {
     return new CustomThreadPool(poolName, config, new RoundRobinBalancer(), new RejectPolicy());
