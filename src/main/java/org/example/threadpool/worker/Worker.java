@@ -38,8 +38,10 @@ public final class Worker implements Runnable {
   /** Whether this worker can still accept new tasks. */
   private volatile boolean running;
 
+  //this is done to remove PMD warnings!
   private static final int MIN_QUEUE_SIZE = 1;
 
+  //this is done to remove PMD warnings!
   private static final long MIN_KEEP_ALIVE_TIME = 0L;
 
   /**

@@ -4,7 +4,7 @@
 
 This project implements a custom thread pool in Java without using `ThreadPoolExecutor`.
 
-It simulates a configurable server-side task execution system capable of processing tasks concurrently, distributing them across worker threads, handling system overload, and supporting graceful shutdown procedures..
+The project simulates a configurable server-side task execution system capable of processing tasks concurrently, distributing them across worker threads, handling overload, and supporting graceful and immediate shutdown.
 
 The implementation was developed as part of a course project and demonstrates several important concurrency and system design concepts:
 
@@ -133,8 +133,8 @@ If no task arrives within the timeout period, the worker may terminate, but only
 
 This allows the pool to grow under load and shrink back when the extra workers are no longer needed.
 
-The architecture was also designed with testability in mind.  
-Key responsibilities were separated into small components such as configuration, balancing, rejection policy, worker control, and pool coordination, which made it possible to cover both deterministic logic and multithreaded behavior with unit and concurrency-oriented tests.
+The architecture also supports good testability.  
+Key responsibilities are separated into small components such as configuration, balancing, rejection policy, worker control, and pool coordination, which makes it possible to cover both deterministic logic and multithreaded behavior with unit and concurrency-oriented tests.
 
 ### Code structure
     src
@@ -377,7 +377,7 @@ Round Robin was chosen because it is:
 - simple to implement
 - easy to explain
 - predictable in behavior
-- fully sufficient for this course work 
+- sufficient for the scope of this course work 
 
 It also matches the task statement, where Round Robin is explicitly suggested as one possible balancing algorithm.
 
@@ -443,7 +443,7 @@ It also clearly shows overload situations during testing and makes failures visi
 - simple and explicit behavior
 - no hidden fallback logic
 - easy to debug
-- easy to explain in this course work (task) 
+- straightforward to justify within the scope of this course work
 
 ### Disadvantages
 
@@ -455,7 +455,7 @@ It also clearly shows overload situations during testing and makes failures visi
 
 A possible alternative would be `CallerRunsPolicy`, where the rejected task is executed in the calling thread.
 
-This would reduce task loss and create natural backpressure, but it would also make the behavior less predictable and slightly more difficult to explain for this course work.
+This would reduce task loss and create natural backpressure, but it would also make the behavior less predictable and would complicate the implementation and explanation within the scope of this course work.
 
 ---
 
@@ -622,7 +622,7 @@ The only mechanism used for running tasks is thread interruption.
 
 The project includes detailed console logging for all major lifecycle events.
 
-In this course work for simplicity, logging is implemented using `System.out.println(...)`.
+In this course work, logging is implemented using `System.out.println(...)` for simplicity.
 
 A production-ready system would normally use a real logging framework such as:
 
@@ -631,7 +631,7 @@ A production-ready system would normally use a real logging framework such as:
 - Log4j
 - `java.util.logging`
 
-However, for this course work, console logging is sufficient and makes behavior easy to observe.
+For the purposes of this course work, console logging is sufficient and makes runtime behavior easy to observe.
 
 ### Logged events
 
@@ -722,7 +722,7 @@ This summary includes:
 - completed throughput
 - rejection rate
 
-This makes the demo not only illustrative, but also measurable.
+This makes the demo measurable in addition to being illustrative.
 
 ---
 
@@ -855,7 +855,7 @@ This configuration comparison demonstrates how pool sizing and queue capacity di
 
 The project includes a set of unit and concurrency-oriented tests that validate the main parts of the custom thread pool implementation.
 
-The test suite was designed step by step, starting from simple deterministic components and then moving to more complex multithreaded scenarios.
+The test suite covers both simple deterministic components and more complex multithreaded scenarios.
 
 The tests were used not only to validate the implementation but also to improve it. In particular, one of the concurrency-oriented tests revealed a race condition in the idle-timeout logic, where multiple workers could stop at the same time and shrink the pool below `corePoolSize`. After identifying this issue through testing, the implementation was corrected and the fix was verified by rerunning the test suite.
 
@@ -1022,7 +1022,7 @@ This test is useful for detecting race conditions and inconsistencies in counter
 
 ### Why these tests are important
 
-This course work is highly concurrent, which means that some errors cannot be found by simple functional checks alone.
+Because this project is highly concurrent, some errors cannot be found by simple functional checks alone.
 
 Several tests were intentionally written around:
 
@@ -1053,7 +1053,7 @@ Instead, the goal is to provide strong coverage for:
 
 ## Performance Notes
 
-This project was implemented primarily as an educational custom thread pool (as a course work statement defines), not as a production-ready high-performance replacement for `ThreadPoolExecutor`.
+This project was implemented as part of a course work assignment and is not intended to be a production-ready high-performance replacement for `ThreadPoolExecutor`.
 
 At the same time, the current version already includes **built-in runtime metrics**, which makes it possible to observe real pool behavior during demo execution instead of relying only on theoretical assumptions.
 
@@ -1211,7 +1211,7 @@ Expected result:
 - higher memory and thread management overhead
 - potentially more waiting inside queues
 
-For an educational report, it is acceptable to describe these expected trade-offs even if full benchmarking is not performed. In this project, the comparison was supplemented with actual measured runtime metrics from demo scenarios.
+For the purposes of this course work, it is reasonable to describe these expected trade-offs even without a full benchmarking study.
 
 ### Example measured results
 
@@ -1272,14 +1272,14 @@ The collected results show that:
 - larger configurations increase throughput and acceptance capacity
 - smaller configurations are more resource-efficient, but reject burst traffic much earlier
 
-For an educational custom thread pool, this level of performance analysis is sufficient to demonstrate both the implementation logic and the practical effect of configuration choices.
+For this course work, this level of performance analysis is sufficient to demonstrate both the implementation logic and the practical effect of configuration choices.
 
 ---
 
 ## Possible Improvements
 
-The current implementation is intentionally simplified.  
-Many improvements could be added later.
+The current implementation is intentionally limited to the scope of the course work.  
+Several improvements could be added in a future version.
 
 ### 1. Add `awaitTermination()`
 
@@ -1409,7 +1409,7 @@ The implementation supports:
 - detailed lifecycle logging
 - built-in runtime metrics
 
-Although the implementation is simpler than standard library executors or production-grade server pools, it successfully demonstrates the main mechanisms required by the task (course work).
+Although the implementation is simpler than standard library executors or production-grade server pools, it demonstrates the main mechanisms required by the assignment (course work).
 
 The most important result of the project is not maximum performance, but a clear understanding of:
 
@@ -1427,4 +1427,4 @@ The measured demo scenarios also show that configuration has a direct and visibl
 - worker scaling
 - queue pressure
 
-As a course project implementation, this work fulfills the assignment goals and provides a good foundation for further experiments with concurrency, configuration tuning, and custom executor design.
+As a course work project, this implementation fulfills the assignment goals and provides a solid foundation for further experiments with concurrency, configuration tuning, and custom executor design.

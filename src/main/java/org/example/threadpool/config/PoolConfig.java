@@ -33,6 +33,7 @@ public final class PoolConfig {
   /** The minimum number of spare (free) workers that the pool should try to keep available. */
   private final int minSpareThreads;
 
+  //the following 4 lines have been added to remove PMD warnings!
   private static final int MIN_POOL_SIZE = 1;
 
   private static final int MIN_QUEUE_SIZE = 1;
